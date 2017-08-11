@@ -18,27 +18,45 @@
 #include <hidl/HidlTransportSupport.h>
 #include <utils/StrongPointer.h>
 
-#include "KeymasterDevice.h"
+#include <nugget/AppClient.h>
+#include <nugget/CitadelClient.h>
 
-using android::OK;
-using android::sp;
-using android::status_t;
-using android::hardware::configureRpcThreadpool;
-using android::hardware::joinRpcThreadpool;
+#include <OemLock.h>
 
-using android::hardware::keymaster::KeymasterDevice;
+// TODO: get this from the nugget repo
+#define APP_ID_AVB 0
+
+using ::android::OK;
+using ::android::sp;
+using ::android::status_t;
+using ::android::hardware::configureRpcThreadpool;
+using ::android::hardware::joinRpcThreadpool;
+
+using ::android::hardware::oemlock::OemLock;
+
+using ::nugget::CitadelClient;
+using ::nugget::AppClient;
 
 int main() {
-    LOG(INFO) << "Keymaster HAL service starting";
+    LOG(INFO) << "OemLock HAL service starting";
+
+    // Connect to Citadel
+    CitadelClient citadel;
+    citadel.open();
+    if (!citadel.isOpen()) {
+        LOG(FATAL) << "Failed to open Citadel client";
+    }
 
     // This thread will become the only thread of the daemon
     constexpr bool thisThreadWillJoinPool = true;
     configureRpcThreadpool(1, thisThreadWillJoinPool);
 
-    sp<KeymasterDevice> keymaster = new KeymasterDevice;
-    const status_t status = keymaster->registerAsService();
+    // Start the HAL service
+    AppClient avbClient{citadel, APP_ID_AVB};
+    sp<OemLock> oemlock = new OemLock{avbClient};
+    const status_t status = oemlock->registerAsService();
     if (status != OK) {
-      LOG(FATAL) << "Failed to register Keymaster as a service (status: " << status << ")";
+      LOG(FATAL) << "Failed to register OemLock as a service (status: " << status << ")";
     }
 
     joinRpcThreadpool();

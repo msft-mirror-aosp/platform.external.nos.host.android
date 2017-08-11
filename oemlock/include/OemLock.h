@@ -19,6 +19,8 @@
 
 #include <android/hardware/oemlock/1.0/IOemLock.h>
 
+#include <nugget/AppClient.h>
+
 namespace android {
 namespace hardware {
 namespace oemlock {
@@ -29,7 +31,12 @@ using ::android::hardware::oemlock::V1_0::OemLockStatus;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 
+using ::nugget::AppClient;
+
 struct OemLock : public IOemLock {
+    OemLock(AppClient& avbApp) : _avbApp{avbApp} {}
+    ~OemLock() override = default;
+
     // Methods from ::android::hardware::oemlock::V1_0::IOemLock follow.
     Return<void> getName(getName_cb _hidl_cb) override;
     Return<OemLockSecureStatus> setOemUnlockAllowedByCarrier(
@@ -37,6 +44,9 @@ struct OemLock : public IOemLock {
     Return<void> isOemUnlockAllowedByCarrier(isOemUnlockAllowedByCarrier_cb _hidl_cb) override;
     Return<OemLockStatus> setOemUnlockAllowedByDevice(bool allowed) override;
     Return<void> isOemUnlockAllowedByDevice(isOemUnlockAllowedByDevice_cb _hidl_cb) override;
+
+private:
+    AppClient& _avbApp;
 };
 
 } // namespace oemlock

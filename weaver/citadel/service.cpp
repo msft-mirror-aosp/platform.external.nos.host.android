@@ -18,27 +18,45 @@
 #include <hidl/HidlTransportSupport.h>
 #include <utils/StrongPointer.h>
 
-#include "OemLock.h"
+#include <nugget/AppClient.h>
+#include <nugget/CitadelClient.h>
 
-using android::OK;
-using android::sp;
-using android::status_t;
-using android::hardware::configureRpcThreadpool;
-using android::hardware::joinRpcThreadpool;
+#include <Weaver.h>
 
-using android::hardware::oemlock::OemLock;
+// TODO: get this from the nugget repo
+#define APP_ID_WEAVER 0
+
+using ::android::OK;
+using ::android::sp;
+using ::android::status_t;
+using ::android::hardware::configureRpcThreadpool;
+using ::android::hardware::joinRpcThreadpool;
+
+using ::android::hardware::weaver::Weaver;
+
+using ::nugget::CitadelClient;
+using ::nugget::AppClient;
 
 int main() {
-    LOG(INFO) << "OemLock HAL service starting";
+    LOG(INFO) << "Weaver HAL service starting";
+
+    // Connect to Citadel
+    CitadelClient citadel;
+    citadel.open();
+    if (!citadel.isOpen()) {
+        LOG(FATAL) << "Failed to open Citadel client";
+    }
 
     // This thread will become the only thread of the daemon
     constexpr bool thisThreadWillJoinPool = true;
     configureRpcThreadpool(1, thisThreadWillJoinPool);
 
-    sp<OemLock> oemlock = new OemLock;
-    const status_t status = oemlock->registerAsService();
+    // Start the HAL service
+    AppClient weaverClient{citadel, APP_ID_WEAVER};
+    sp<Weaver> weaver = new Weaver{weaverClient};
+    const status_t status = weaver->registerAsService();
     if (status != OK) {
-      LOG(FATAL) << "Failed to register OemLock as a service (status: " << status << ")";
+      LOG(FATAL) << "Failed to register Weaver as a service (status: " << status << ")";
     }
 
     joinRpcThreadpool();

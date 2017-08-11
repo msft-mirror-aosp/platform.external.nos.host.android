@@ -15,38 +15,11 @@
 //
 
 subdirs = [
-    "libnugget",
-
-    // HALs
-    "keymaster",
-    "oemlock",
-    "weaver",
+    "citadel",
 ]
 
-// Defaults for all Nugget related C and C++ code
-cc_defaults {
-    name: "nugget_cc_defaults",
-    relative_install_path: "hw",
-    vendor: true,
-    owner: "google",
-    clang: true,
-    cflags: [
-        "-pedantic",
-        "-Wall",
-        "-Wextra",
-        "-Werror",
-    ],
-}
-
-// Defaults for the Nugget HAL binaries
-cc_defaults {
-    name: "nugget_hal_defaults",
+cc_library {
+    name: "libnugget",
     defaults: ["nugget_cc_defaults"],
-    shared_libs: [
-        "libbase",
-        "libhidlbase",
-        "libhidltransport",
-        "libnugget",
-        "libutils",
-    ],
+    export_include_dirs: ["include"],
 }

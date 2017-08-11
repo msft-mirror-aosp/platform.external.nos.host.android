@@ -19,6 +19,8 @@
 
 #include <android/hardware/keymaster/3.0/IKeymasterDevice.h>
 
+#include <nugget/AppClient.h>
+
 namespace android {
 namespace hardware {
 namespace keymaster {
@@ -31,7 +33,12 @@ using ::android::hardware::keymaster::V3_0::KeyPurpose;
 using ::android::hardware::Return;
 using ::android::hardware::hidl_vec;
 
-class KeymasterDevice : public IKeymasterDevice {
+using ::nugget::AppClient;
+
+struct KeymasterDevice : public IKeymasterDevice {
+    KeymasterDevice(AppClient& keymasterApp) : _keymasterApp{keymasterApp} {}
+    ~KeymasterDevice() override = default;
+
     // Methods from ::android::hardware::keymaster::V3_0::IKeymasterDevice follow.
     Return<void> getHardwareFeatures(getHardwareFeatures_cb _hidl_cb);
     Return<ErrorCode> addRngEntropy(const hidl_vec<uint8_t>& data) override;
@@ -63,6 +70,9 @@ class KeymasterDevice : public IKeymasterDevice {
                         const hidl_vec<uint8_t>& input, const hidl_vec<uint8_t>& signature,
                         finish_cb _hidl_cb) override;
     Return<ErrorCode> abort(uint64_t operationHandle) override;
+
+private:
+    AppClient& _keymasterApp;
 };
 
 }  // namespace keymaster

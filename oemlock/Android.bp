@@ -14,15 +14,19 @@
 // limitations under the License.
 //
 
-cc_binary {
-    name: "android.hardware.oemlock@1.0-service.nugget",
-    init_rc: ["android.hardware.oemlock@1.0-service.nugget.rc"],
+subdirs = [
+    "citadel",
+]
+
+cc_library {
+    name: "nugget_hal_oemlock",
     srcs: [
-        "service.cpp",
         "OemLock.cpp",
     ],
     defaults: ["nugget_hal_defaults"],
     shared_libs: [
         "android.hardware.oemlock@1.0",
+        "libnugget",
     ],
+    export_include_dirs: ["include"],
 }

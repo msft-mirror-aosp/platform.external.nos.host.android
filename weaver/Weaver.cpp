@@ -36,6 +36,7 @@ Return<void> Weaver::getConfig(getConfig_cb _hidl_cb) {
 
     // TODO: implement
     LOG(ERROR) << "Not implemented";
+    (void) _weaverApp;
 
     _hidl_cb(WeaverStatus::FAILED, WeaverConfig{});
     return Void();

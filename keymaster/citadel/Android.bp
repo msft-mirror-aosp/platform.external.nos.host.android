@@ -14,39 +14,16 @@
 // limitations under the License.
 //
 
-subdirs = [
-    "libnugget",
-
-    // HALs
-    "keymaster",
-    "oemlock",
-    "weaver",
-]
-
-// Defaults for all Nugget related C and C++ code
-cc_defaults {
-    name: "nugget_cc_defaults",
-    relative_install_path: "hw",
-    vendor: true,
-    owner: "google",
-    clang: true,
-    cflags: [
-        "-pedantic",
-        "-Wall",
-        "-Wextra",
-        "-Werror",
+cc_binary {
+    name: "android.hardware.keymaster@3.0-service.citadel",
+    init_rc: ["android.hardware.keymaster@3.0-service.citadel.rc"],
+    srcs: [
+        "service.cpp",
     ],
-}
-
-// Defaults for the Nugget HAL binaries
-cc_defaults {
-    name: "nugget_hal_defaults",
-    defaults: ["nugget_cc_defaults"],
+    defaults: ["nugget_hal_defaults"],
     shared_libs: [
-        "libbase",
-        "libhidlbase",
-        "libhidltransport",
-        "libnugget",
-        "libutils",
+        "android.hardware.keymaster@3.0",
+        "libnugget_citadel",
+        "nugget_hal_keymaster",
     ],
 }

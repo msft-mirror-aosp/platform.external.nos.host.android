@@ -14,15 +14,19 @@
 // limitations under the License.
 //
 
-cc_binary {
-    name: "android.hardware.keymaster@3.0-service.nugget",
-    init_rc: ["android.hardware.keymaster@3.0-service.nugget.rc"],
+subdirs = [
+    "citadel",
+]
+
+cc_library {
+    name: "nugget_hal_keymaster",
     srcs: [
-        "service.cpp",
         "KeymasterDevice.cpp",
     ],
     defaults: ["nugget_hal_defaults"],
     shared_libs: [
         "android.hardware.keymaster@3.0",
+        "libnugget",
     ],
+    export_include_dirs: ["include"],
 }

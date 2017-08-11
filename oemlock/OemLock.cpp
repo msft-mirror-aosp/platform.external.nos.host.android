@@ -38,6 +38,7 @@ Return<OemLockSecureStatus> OemLock::setOemUnlockAllowedByCarrier(
 
     // TODO: implement
     LOG(ERROR) << "Not implemented";
+    (void) _avbApp;
     (void) signature;
 
     return OemLockSecureStatus::FAILED;

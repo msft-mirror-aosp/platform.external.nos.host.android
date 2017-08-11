@@ -18,27 +18,45 @@
 #include <hidl/HidlTransportSupport.h>
 #include <utils/StrongPointer.h>
 
-#include "Weaver.h"
+#include <nugget/AppClient.h>
+#include <nugget/CitadelClient.h>
 
-using android::OK;
-using android::sp;
-using android::status_t;
-using android::hardware::configureRpcThreadpool;
-using android::hardware::joinRpcThreadpool;
+#include <KeymasterDevice.h>
 
-using android::hardware::weaver::Weaver;
+// TODO: get this from the nugget repo
+#define APP_ID_KEYMASTER 0
+
+using ::android::OK;
+using ::android::sp;
+using ::android::status_t;
+using ::android::hardware::configureRpcThreadpool;
+using ::android::hardware::joinRpcThreadpool;
+
+using ::android::hardware::keymaster::KeymasterDevice;
+
+using ::nugget::CitadelClient;
+using ::nugget::AppClient;
 
 int main() {
-    LOG(INFO) << "Weaver HAL service starting";
+    LOG(INFO) << "Keymaster HAL service starting";
+
+    // Connect to Citadel
+    CitadelClient citadel;
+    citadel.open();
+    if (!citadel.isOpen()) {
+        LOG(FATAL) << "Failed to open Citadel client";
+    }
 
     // This thread will become the only thread of the daemon
     constexpr bool thisThreadWillJoinPool = true;
     configureRpcThreadpool(1, thisThreadWillJoinPool);
 
-    sp<Weaver> weaver = new Weaver;
-    const status_t status = weaver->registerAsService();
+    // Start the HAL service
+    AppClient keymasterClient{citadel, APP_ID_KEYMASTER};
+    sp<KeymasterDevice> keymaster = new KeymasterDevice{keymasterClient};
+    const status_t status = keymaster->registerAsService();
     if (status != OK) {
-      LOG(FATAL) << "Failed to register Weaver as a service (status: " << status << ")";
+      LOG(FATAL) << "Failed to register Keymaster as a service (status: " << status << ")";
     }
 
     joinRpcThreadpool();
