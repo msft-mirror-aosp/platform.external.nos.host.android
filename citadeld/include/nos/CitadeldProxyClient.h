@@ -14,23 +14,28 @@
  * limitations under the License.
  */
 
-#ifndef NOS_CITADEL_CLIENT_H
-#define NOS_CITADEL_CLIENT_H
+#ifndef NOS_CITADELD_PROXY_CLIENT_H
+#define NOS_CITADELD_PROXY_CLIENT_H
 
 #include <cstdint>
 #include <vector>
 
 #include <nos/NuggetClient.h>
 
+#include <android/hardware/citadel/ICitadeld.h>
+
 namespace nos {
 
 /**
- * Implementation of NuggetClient for Citadel.
+ * Implementation of NuggetClient to proxy calls via the citadeld synchronizing
+ * daemon which coordinates communication between the HALs and Citadel.
  */
-class CitadelClient : public NuggetClient {
+class CitadeldProxyClient : public NuggetClient {
+    ::android::sp<::android::hardware::citadel::ICitadeld> _citadeld;
+
 public:
-    CitadelClient() = default;
-    ~CitadelClient() override;
+    CitadeldProxyClient() = default;
+    ~CitadeldProxyClient() override;
 
     void open() override;
     void close() override;
@@ -42,4 +47,4 @@ public:
 
 } // namespace nos
 
-#endif // NOS_CITADEL_CLIENT_H
+#endif // NOS_CITADELD_PROXY_CLIENT_H

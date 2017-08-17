@@ -20,7 +20,7 @@
 
 #include <application.h>
 #include <nos/AppClient.h>
-#include <nos/CitadelClient.h>
+#include <nos/CitadeldProxyClient.h>
 
 #include <OemLock.h>
 
@@ -32,17 +32,17 @@ using ::android::hardware::joinRpcThreadpool;
 
 using ::android::hardware::oemlock::OemLock;
 
-using ::nos::CitadelClient;
+using ::nos::CitadeldProxyClient;
 using ::nos::AppClient;
 
 int main() {
     LOG(INFO) << "OemLock HAL service starting";
 
     // Connect to Citadel
-    CitadelClient citadel;
-    citadel.open();
-    if (!citadel.isOpen()) {
-        LOG(FATAL) << "Failed to open Citadel client";
+    CitadeldProxyClient citadeldProxy;
+    citadeldProxy.open();
+    if (!citadeldProxy.isOpen()) {
+        LOG(FATAL) << "Failed to open citadeld client";
     }
 
     // This thread will become the only thread of the daemon
@@ -50,7 +50,7 @@ int main() {
     configureRpcThreadpool(1, thisThreadWillJoinPool);
 
     // Start the HAL service
-    AppClient avbClient{citadel, APP_ID_AVB};
+    AppClient avbClient{citadeldProxy, APP_ID_AVB};
     sp<OemLock> oemlock = new OemLock{avbClient};
     const status_t status = oemlock->registerAsService();
     if (status != OK) {

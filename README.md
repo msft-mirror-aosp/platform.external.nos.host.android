@@ -34,8 +34,6 @@ desired. Support for this could be added in:
 
 ## citadeld
 
-Work in progress.
-
 Citadel will be running Nugget. In order to synchronize access to the driver /
 bus, HALs should proxy all communication via the `citadeld` daemon which will be
 the only service with driver access.

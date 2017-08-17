@@ -20,7 +20,7 @@
 
 #include <application.h>
 #include <nos/AppClient.h>
-#include <nos/CitadelClient.h>
+#include <nos/CitadeldProxyClient.h>
 
 #include <KeymasterDevice.h>
 
@@ -32,17 +32,17 @@ using ::android::hardware::joinRpcThreadpool;
 
 using ::android::hardware::keymaster::KeymasterDevice;
 
-using ::nos::CitadelClient;
+using ::nos::CitadeldProxyClient;
 using ::nos::AppClient;
 
 int main() {
     LOG(INFO) << "Keymaster HAL service starting";
 
     // Connect to Citadel
-    CitadelClient citadel;
-    citadel.open();
-    if (!citadel.isOpen()) {
-        LOG(FATAL) << "Failed to open Citadel client";
+    CitadeldProxyClient citadeldProxy;
+    citadeldProxy.open();
+    if (!citadeldProxy.isOpen()) {
+        LOG(FATAL) << "Failed to open citadeld client";
     }
 
     // This thread will become the only thread of the daemon
@@ -50,7 +50,7 @@ int main() {
     configureRpcThreadpool(1, thisThreadWillJoinPool);
 
     // Start the HAL service
-    AppClient keymasterClient{citadel, APP_ID_KEYMASTER};
+    AppClient keymasterClient{citadeldProxy, APP_ID_KEYMASTER};
     sp<KeymasterDevice> keymaster = new KeymasterDevice{keymasterClient};
     const status_t status = keymaster->registerAsService();
     if (status != OK) {

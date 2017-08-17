@@ -17,6 +17,7 @@
 cc_binary {
     name: "android.hardware.oemlock@1.0-service.citadel",
     init_rc: ["android.hardware.oemlock@1.0-service.citadel.rc"],
+    required: ["citadeld"],
     srcs: [
         "service.cpp",
     ],
@@ -24,6 +25,6 @@ cc_binary {
     shared_libs: [
         "android.hardware.oemlock@1.0",
         "android.hardware.oemlock@1.0-impl.nos",
-        "libnos_citadel",
+        "libnos_citadeld_proxy",
     ],
 }

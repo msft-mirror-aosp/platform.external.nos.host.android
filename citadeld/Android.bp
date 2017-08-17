@@ -14,17 +14,41 @@
 // limitations under the License.
 //
 
-cc_binary {
-    name: "android.hardware.keymaster@3.0-service.citadel",
-    init_rc: ["android.hardware.keymaster@3.0-service.citadel.rc"],
-    required: ["citadeld"],
+cc_defaults {
+    name: "citadeld_defaults",
     srcs: [
-        "service.cpp",
+        "aidl/android/hardware/citadel/ICitadeld.aidl",
     ],
-    defaults: ["nos_hal_defaults"],
+    defaults: ["nos_cc_defaults"],
     shared_libs: [
-        "android.hardware.keymaster@3.0",
-        "android.hardware.keymaster@3.0-impl.nos",
-        "libnos_citadeld_proxy",
+        "libbase",
+        "libbinder",
+        "libnos",
+        "libutils",
     ],
+}
+
+cc_binary {
+    name: "citadeld",
+    init_rc: ["citadeld.rc"],
+    srcs: [
+        "main.cpp",
+    ],
+    defaults: ["citadeld_defaults"],
+    shared_libs: [
+        "libnos_citadel",
+    ],
+}
+
+cc_library {
+    name: "libnos_citadeld_proxy",
+    srcs: [
+        "CitadeldProxyClient.cpp",
+    ],
+    defaults: ["citadeld_defaults"],
+    export_include_dirs: ["include"],
+    export_shared_lib_headers: ["libbinder"],
+    aidl: {
+        export_aidl_headers: true,
+    },
 }
