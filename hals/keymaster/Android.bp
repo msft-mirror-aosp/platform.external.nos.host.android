@@ -19,7 +19,7 @@ subdirs = [
 ]
 
 cc_library {
-    name: "nos_hal_keymaster",
+    name: "android.hardware.keymaster@3.0-impl.nos",
     srcs: [
         "KeymasterDevice.cpp",
     ],

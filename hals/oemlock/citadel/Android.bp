@@ -23,7 +23,7 @@ cc_binary {
     defaults: ["nos_hal_defaults"],
     shared_libs: [
         "android.hardware.oemlock@1.0",
+        "android.hardware.oemlock@1.0-impl.nos",
         "libnos_citadel",
-        "nos_hal_oemlock",
     ],
 }
