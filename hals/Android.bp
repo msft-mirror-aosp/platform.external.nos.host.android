@@ -15,21 +15,20 @@
 //
 
 subdirs = [
-    "hals",
-    "libnos",
+    "keymaster",
+    "oemlock",
+    "weaver",
 ]
 
-// Defaults for all libnos related C and C++ code
+// Defaults for the libnos HAL binaries
 cc_defaults {
-    name: "nos_cc_defaults",
-    relative_install_path: "hw",
-    vendor: true,
-    owner: "google",
-    clang: true,
-    cflags: [
-        "-pedantic",
-        "-Wall",
-        "-Wextra",
-        "-Werror",
+    name: "nos_hal_defaults",
+    defaults: ["nos_cc_defaults"],
+    shared_libs: [
+        "libbase",
+        "libhidlbase",
+        "libhidltransport",
+        "libnos",
+        "libutils",
     ],
 }
