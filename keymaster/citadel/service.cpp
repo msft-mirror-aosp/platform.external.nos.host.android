@@ -18,8 +18,8 @@
 #include <hidl/HidlTransportSupport.h>
 #include <utils/StrongPointer.h>
 
-#include <nugget/AppClient.h>
-#include <nugget/CitadelClient.h>
+#include <nos/AppClient.h>
+#include <nos/CitadelClient.h>
 
 #include <KeymasterDevice.h>
 
@@ -34,8 +34,8 @@ using ::android::hardware::joinRpcThreadpool;
 
 using ::android::hardware::keymaster::KeymasterDevice;
 
-using ::nugget::CitadelClient;
-using ::nugget::AppClient;
+using ::nos::CitadelClient;
+using ::nos::AppClient;
 
 int main() {
     LOG(INFO) << "Keymaster HAL service starting";

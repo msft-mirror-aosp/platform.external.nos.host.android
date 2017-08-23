@@ -1,14 +1,14 @@
-# Android components for Nugget OS
+# Android components for Nugget
 
 Android communicates with Nugget apps in order to implement security related
 HALs. Currently, those HALs are Keymaster, Weaver and OemLock.
 
-## libnugget
+## libnos
 
-libnugget offers the `NuggetClient` interface that should be used by the HALs.
+libnos offers the `NuggetClient` interface that should be used by the HALs.
 `AppClient` is a wrapper around a `NuggetClient` for talking to a specific app.
 
-Nugget OS can be implemented on a number of chips with different drivers so the
+Nugget can be implemented on a number of chips with different drivers so the
 NuggetClient interface must be implemented for the hardware in use. This
 interface also allows proxing via a synchronizing service and injecting mocks
 for testing.
@@ -36,9 +36,9 @@ desired. Support for this could be added in:
 
 Work in progress.
 
-Citadel will be running Nugget OS. In order to synchronize access to the driver
-/ bus, HALs should proxy all communication via the `citadeld` daemon which will
-be the only service with driver access.
+Citadel will be running Nugget. In order to synchronize access to the driver /
+bus, HALs should proxy all communication via the `citadeld` daemon which will be
+the only service with driver access.
 
 Synchronizing with this service, rather than in the driver, allows for easier
 debugging and fixing should the need arise.

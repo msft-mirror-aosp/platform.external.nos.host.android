@@ -19,7 +19,7 @@
 
 #include <android/hardware/keymaster/3.0/IKeymasterDevice.h>
 
-#include <nugget/AppClient.h>
+#include <nos/AppClient.h>
 
 namespace android {
 namespace hardware {
@@ -33,7 +33,7 @@ using ::android::hardware::keymaster::V3_0::KeyPurpose;
 using ::android::hardware::Return;
 using ::android::hardware::hidl_vec;
 
-using ::nugget::AppClient;
+using ::nos::AppClient;
 
 struct KeymasterDevice : public IKeymasterDevice {
     KeymasterDevice(AppClient& keymasterApp) : _keymasterApp{keymasterApp} {}

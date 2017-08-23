@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-#ifndef NUGGET_NUGGET_CLIENT_H
-#define NUGGET_NUGGET_CLIENT_H
+#ifndef NOS_NUGGET_CLIENT_H
+#define NOS_NUGGET_CLIENT_H
 
 #include <cstdint>
 #include <vector>
 
-namespace nugget {
+namespace nos {
 
 /**
- * Abstract client to communicate with Nugget OS via the transport API.
+ * Abstract client to communicate with Nugget via the transport API.
  *
  * This allows different drivers to implement the interface and tests to mock
  * it.
@@ -33,24 +33,24 @@ public:
     virtual ~NuggetClient() = default;
 
     /**
-     * Opens a connection to Nugget OS.
+     * Opens a connection to Nugget.
      *
      * If this fails, isOpen() will return false.
      */
     virtual void open() = 0;
 
     /**
-     * Closes the connection to Nugget OS.
+     * Closes the connection to Nugget.
      */
     virtual void close() = 0;
 
     /**
-     * Checked whether a connection is open to Nugget OS.
+     * Checked whether a connection is open to Nugget.
      */
     virtual bool isOpen() = 0;
 
     /**
-     * Call into and app running on Nugget OS.
+     * Call into and app running on Nugget.
      *
      * @param app_id   The ID of the app to call.
      * @param arg      Argument to pass to the app.
@@ -63,6 +63,6 @@ public:
                              std::vector<uint8_t>& response) = 0;
 };
 
-} // namespace nugget
+} // namespace nos
 
-#endif // NUGGET_NUGGET_CLIENT_H
+#endif // NOS_NUGGET_CLIENT_H

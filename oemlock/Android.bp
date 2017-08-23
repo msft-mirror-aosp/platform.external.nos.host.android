@@ -19,14 +19,14 @@ subdirs = [
 ]
 
 cc_library {
-    name: "nugget_hal_oemlock",
+    name: "nos_hal_oemlock",
     srcs: [
         "OemLock.cpp",
     ],
-    defaults: ["nugget_hal_defaults"],
+    defaults: ["nos_hal_defaults"],
     shared_libs: [
         "android.hardware.oemlock@1.0",
-        "libnugget",
+        "libnos",
     ],
     export_include_dirs: ["include"],
 }

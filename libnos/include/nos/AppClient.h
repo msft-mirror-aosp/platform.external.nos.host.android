@@ -15,26 +15,26 @@
  * limitations under the License.
  */
 
-#ifndef NUGGET_APP_CLIENT_H
-#define NUGGET_APP_CLIENT_H
+#ifndef NOS_APP_CLIENT_H
+#define NOS_APP_CLIENT_H
 
 #include <cstdint>
 #include <vector>
 
-#include <nugget/NuggetClient.h>
+#include <nos/NuggetClient.h>
 
-namespace nugget {
+namespace nos {
 
 /**
- * Client to communicate with an app running on Nugget OS.
+ * Client to communicate with an app running on Nugget.
  */
 class AppClient {
 public:
     /**
      * Create a client for an app with the given ID that communicates with
-     * Nugget OS through the given NuggetClient.
+     * Nugget through the given NuggetClient.
      *
-     * @param client Client for Nugget OS.
+     * @param client Client for Nugget.
      * @param appId  ID of the target app.
      */
     AppClient(NuggetClient& client, uint32_t appId)
@@ -58,6 +58,6 @@ private:
     uint32_t _appId;
 };
 
-} // namespace nugget
+} // namespace nos
 
-#endif // NUGGET_APP_CLIENT_H
+#endif // NOS_APP_CLIENT_H

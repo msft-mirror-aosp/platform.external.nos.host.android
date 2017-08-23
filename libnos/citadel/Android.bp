@@ -15,13 +15,13 @@
 //
 
 cc_library {
-    name: "libnugget_citadel",
+    name: "libnos_citadel",
     srcs: [
         "CitadelClient.cpp",
     ],
-    defaults: ["nugget_cc_defaults"],
+    defaults: ["nos_cc_defaults"],
     shared_libs: [
-        "libnugget",
+        "libnos",
     ],
     export_include_dirs: ["include"],
 }

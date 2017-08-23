@@ -15,7 +15,7 @@
 //
 
 subdirs = [
-    "libnugget",
+    "libnos",
 
     // HALs
     "keymaster",
@@ -23,9 +23,9 @@ subdirs = [
     "weaver",
 ]
 
-// Defaults for all Nugget related C and C++ code
+// Defaults for all libnos related C and C++ code
 cc_defaults {
-    name: "nugget_cc_defaults",
+    name: "nos_cc_defaults",
     relative_install_path: "hw",
     vendor: true,
     owner: "google",
@@ -38,15 +38,15 @@ cc_defaults {
     ],
 }
 
-// Defaults for the Nugget HAL binaries
+// Defaults for the libnos HAL binaries
 cc_defaults {
-    name: "nugget_hal_defaults",
-    defaults: ["nugget_cc_defaults"],
+    name: "nos_hal_defaults",
+    defaults: ["nos_cc_defaults"],
     shared_libs: [
         "libbase",
         "libhidlbase",
         "libhidltransport",
-        "libnugget",
+        "libnos",
         "libutils",
     ],
 }

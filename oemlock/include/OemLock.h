@@ -19,7 +19,7 @@
 
 #include <android/hardware/oemlock/1.0/IOemLock.h>
 
-#include <nugget/AppClient.h>
+#include <nos/AppClient.h>
 
 namespace android {
 namespace hardware {
@@ -31,7 +31,7 @@ using ::android::hardware::oemlock::V1_0::OemLockStatus;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 
-using ::nugget::AppClient;
+using ::nos::AppClient;
 
 struct OemLock : public IOemLock {
     OemLock(AppClient& avbApp) : _avbApp{avbApp} {}

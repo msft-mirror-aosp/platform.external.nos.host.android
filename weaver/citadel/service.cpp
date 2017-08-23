@@ -18,8 +18,8 @@
 #include <hidl/HidlTransportSupport.h>
 #include <utils/StrongPointer.h>
 
-#include <nugget/AppClient.h>
-#include <nugget/CitadelClient.h>
+#include <nos/AppClient.h>
+#include <nos/CitadelClient.h>
 
 #include <Weaver.h>
 
@@ -34,8 +34,8 @@ using ::android::hardware::joinRpcThreadpool;
 
 using ::android::hardware::weaver::Weaver;
 
-using ::nugget::CitadelClient;
-using ::nugget::AppClient;
+using ::nos::CitadelClient;
+using ::nos::AppClient;
 
 int main() {
     LOG(INFO) << "Weaver HAL service starting";

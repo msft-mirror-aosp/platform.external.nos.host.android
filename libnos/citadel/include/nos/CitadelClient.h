@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-#ifndef NUGGET_CITADEL_CLIENT_H
-#define NUGGET_CITADEL_CLIENT_H
+#ifndef NOS_CITADEL_CLIENT_H
+#define NOS_CITADEL_CLIENT_H
 
 #include <cstdint>
 #include <vector>
 
-#include <nugget/NuggetClient.h>
+#include <nos/NuggetClient.h>
 
-namespace nugget {
+namespace nos {
 
 /**
  * Implementation of NuggetClient for Citadel.
@@ -39,6 +39,6 @@ public:
                      std::vector<uint8_t>& response) override;
 };
 
-} // namespace nugget
+} // namespace nos
 
-#endif // NUGGET_CITADEL_CLIENT_H
+#endif // NOS_CITADEL_CLIENT_H

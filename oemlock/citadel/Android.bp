@@ -20,10 +20,10 @@ cc_binary {
     srcs: [
         "service.cpp",
     ],
-    defaults: ["nugget_hal_defaults"],
+    defaults: ["nos_hal_defaults"],
     shared_libs: [
         "android.hardware.oemlock@1.0",
-        "libnugget_citadel",
-        "nugget_hal_oemlock",
+        "libnos_citadel",
+        "nos_hal_oemlock",
     ],
 }

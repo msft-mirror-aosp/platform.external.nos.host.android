@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#include <nugget/CitadelClient.h>
+#include <nos/CitadelClient.h>
 
-namespace nugget {
+namespace nos {
 
 CitadelClient::~CitadelClient() {
     close();
@@ -46,4 +46,4 @@ uint32_t CitadelClient::callApp(uint32_t appId, uint16_t arg,
     return 3; // Currently APP_ERROR_DRIVER
 }
 
-} // namespace nugget
+} // namespace nos

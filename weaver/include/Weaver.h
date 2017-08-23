@@ -19,7 +19,7 @@
 
 #include <android/hardware/weaver/1.0/IWeaver.h>
 
-#include <nugget/AppClient.h>
+#include <nos/AppClient.h>
 
 namespace android {
 namespace hardware {
@@ -30,7 +30,7 @@ using ::android::hardware::weaver::V1_0::WeaverStatus;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 
-using ::nugget::AppClient;
+using ::nos::AppClient;
 
 struct Weaver : public IWeaver {
     Weaver(AppClient& weaverApp) : _weaverApp{weaverApp} {}

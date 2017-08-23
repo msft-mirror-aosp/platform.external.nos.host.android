@@ -19,14 +19,14 @@ subdirs = [
 ]
 
 cc_library {
-    name: "nugget_hal_weaver",
+    name: "nos_hal_weaver",
     srcs: [
         "Weaver.cpp",
     ],
-    defaults: ["nugget_hal_defaults"],
+    defaults: ["nos_hal_defaults"],
     shared_libs: [
         "android.hardware.weaver@1.0",
-        "libnugget",
+        "libnos",
     ],
     export_include_dirs: ["include"],
 }

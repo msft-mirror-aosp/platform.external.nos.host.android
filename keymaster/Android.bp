@@ -19,14 +19,14 @@ subdirs = [
 ]
 
 cc_library {
-    name: "nugget_hal_keymaster",
+    name: "nos_hal_keymaster",
     srcs: [
         "KeymasterDevice.cpp",
     ],
-    defaults: ["nugget_hal_defaults"],
+    defaults: ["nos_hal_defaults"],
     shared_libs: [
         "android.hardware.keymaster@3.0",
-        "libnugget",
+        "libnos",
     ],
     export_include_dirs: ["include"],
 }
