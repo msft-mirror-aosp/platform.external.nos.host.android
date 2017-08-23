@@ -24,6 +24,9 @@ subdirs = [
 cc_defaults {
     name: "nos_hal_defaults",
     defaults: ["nos_cc_defaults"],
+    header_libs: [
+        "nos_headers",
+    ],
     shared_libs: [
         "libbase",
         "libhidlbase",

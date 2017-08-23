@@ -18,13 +18,11 @@
 #include <hidl/HidlTransportSupport.h>
 #include <utils/StrongPointer.h>
 
+#include <application.h>
 #include <nos/AppClient.h>
 #include <nos/CitadelClient.h>
 
 #include <Weaver.h>
-
-// TODO: get this from the nugget repo
-#define APP_ID_WEAVER 0
 
 using ::android::OK;
 using ::android::sp;
