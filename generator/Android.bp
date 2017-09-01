@@ -15,36 +15,14 @@
 //
 
 subdirs = [
-    "citadeld",
-    "generator",
-    "hals",
-    "libnos",
+    "test",
 ]
 
-// The language related defaults
-cc_defaults {
-    name: "nos_base_cc_defaults",
-    clang: true,
-    cflags: [
-        "-pedantic",
-        "-Wall",
-        "-Wextra",
-        "-Werror",
-    ],
-}
-
-// Language and vendor related defaults
-cc_defaults {
-    name: "nos_cc_defaults",
+cc_binary_host {
+    name: "protoc-gen-nos-client-cpp",
+    srcs: ["main.cpp"],
     defaults: ["nos_base_cc_defaults"],
-    relative_install_path: "hw",
-    vendor: true,
-    owner: "google",
-}
-
-// Defaults for components shared between the host and device
-cc_defaults {
-    name: "nos_shared_cc_defaults",
-    defaults: ["nos_cc_defaults"],
-    host_supported: true,
+    cflags: ["-Wno-unused-parameter"],
+    static_libs: ["nos_proto_options"],
+    shared_libs: ["libprotoc"],
 }
