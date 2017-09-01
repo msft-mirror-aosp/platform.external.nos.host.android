@@ -20,12 +20,9 @@ subdirs = [
     "libnos",
 ]
 
-// Defaults for all libnos related C and C++ code
+// The language related defaults
 cc_defaults {
-    name: "nos_cc_defaults",
-    relative_install_path: "hw",
-    vendor: true,
-    owner: "google",
+    name: "nos_base_cc_defaults",
     clang: true,
     cflags: [
         "-pedantic",
@@ -33,4 +30,20 @@ cc_defaults {
         "-Wextra",
         "-Werror",
     ],
+}
+
+// Language and vendor related defaults
+cc_defaults {
+    name: "nos_cc_defaults",
+    defaults: ["nos_base_cc_defaults"],
+    relative_install_path: "hw",
+    vendor: true,
+    owner: "google",
+}
+
+// Defaults for components shared between the host and device
+cc_defaults {
+    name: "nos_shared_cc_defaults",
+    defaults: ["nos_cc_defaults"],
+    host_supported: true,
 }

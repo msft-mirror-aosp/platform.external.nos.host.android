@@ -14,13 +14,8 @@
 // limitations under the License.
 //
 
-subdirs = [
-    "citadel",
-    "test",
-]
-
-cc_library {
-    name: "libnos",
+cc_test_library {
+    name: "libnos_mock",
     defaults: ["nos_shared_cc_defaults"],
     export_include_dirs: ["include"],
 }
