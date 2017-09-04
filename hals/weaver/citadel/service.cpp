@@ -23,6 +23,7 @@
 #include <nos/CitadeldProxyClient.h>
 
 #include <Weaver.h>
+#include <Weaver.client.h>
 
 using ::android::OK;
 using ::android::sp;
@@ -34,6 +35,8 @@ using ::android::hardware::weaver::Weaver;
 
 using ::nos::CitadeldProxyClient;
 using ::nos::AppClient;
+
+using WeaverClient = ::nugget::app::weaver::Weaver;
 
 int main() {
     LOG(INFO) << "Weaver HAL service starting";
@@ -50,7 +53,7 @@ int main() {
     configureRpcThreadpool(1, thisThreadWillJoinPool);
 
     // Start the HAL service
-    AppClient weaverClient{citadeldProxy, APP_ID_WEAVER};
+    WeaverClient weaverClient{citadeldProxy};
     sp<Weaver> weaver = new Weaver{weaverClient};
     const status_t status = weaver->registerAsService();
     if (status != OK) {

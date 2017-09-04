@@ -19,7 +19,7 @@
 
 #include <android/hardware/weaver/1.0/IWeaver.h>
 
-#include <nos/AppClient.h>
+#include <Weaver.client.h>
 
 namespace android {
 namespace hardware {
@@ -30,10 +30,10 @@ using ::android::hardware::weaver::V1_0::WeaverStatus;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 
-using ::nos::AppClient;
+using WeaverClient = ::nugget::app::weaver::IWeaver;
 
 struct Weaver : public IWeaver {
-    Weaver(AppClient& weaverApp) : _weaverApp{weaverApp} {}
+    Weaver(WeaverClient& weaver) : _weaver{weaver} {}
     ~Weaver() override = default;
 
     // Methods from ::android::hardware::weaver::V1_0::IWeaver follow.
@@ -43,7 +43,7 @@ struct Weaver : public IWeaver {
     Return<void> read(uint32_t slotId, const hidl_vec<uint8_t>& key, read_cb _hidl_cb) override;
 
 private:
-    AppClient& _weaverApp;
+    WeaverClient& _weaver;
 };
 
 } // namespace weaver

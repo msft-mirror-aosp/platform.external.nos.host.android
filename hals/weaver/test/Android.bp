@@ -14,21 +14,19 @@
 // limitations under the License.
 //
 
-subdirs = [
-    "citadel",
-    "test",
-]
-
-cc_library {
-    name: "android.hardware.weaver@1.0-impl.nos",
+cc_test {
+    name: "android.hardware.weaver@1.0-impl.nos_test",
+    generated_headers: ["nos_app_weaver_service_genc++_mock"],
     srcs: [
-        "Weaver.cpp",
+        "test.cpp",
     ],
     defaults: ["nos_hal_defaults"],
+    header_libs: ["nos_headers"],
+    static_libs: ["libgmock"],
     shared_libs: [
         "android.hardware.weaver@1.0",
+        "android.hardware.weaver@1.0-impl.nos",
         "libprotobuf-cpp-full",
         "nos_app_weaver",
     ],
-    export_include_dirs: ["include"],
 }
