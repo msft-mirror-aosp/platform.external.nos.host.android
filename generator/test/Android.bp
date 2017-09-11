@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-GEN_SERVICE = "$(location aprotoc) --plugin=protoc-gen-nos-client-cpp=$(location protoc-gen-nos-client-cpp) $(in) -Iexternal/protobuf/src -Iexternal/nos/util/protobuf"
+GEN_SERVICE = "$(location aprotoc) --plugin=protoc-gen-nos-client-cpp=$(location protoc-gen-nos-client-cpp) $(in) -Iexternal/protobuf/src -Iexternal/libnos/nugget/proto"
 
 GEN_SERVICE_SOURCE = GEN_SERVICE + " --nos-client-cpp_out=source:$(genDir) "
 GEN_SERVICE_HEADER = GEN_SERVICE + " --nos-client-cpp_out=header:$(genDir) "
@@ -25,7 +25,7 @@ genrule {
     out: ["Hello.client.cpp"],
     srcs: ["test.proto"],
     tools: ["aprotoc", "protoc-gen-nos-client-cpp"],
-    cmd: GEN_SERVICE_SOURCE + "-Iexternal/libnos/generator/test",
+    cmd: GEN_SERVICE_SOURCE + "-Iexternal/libnos-hals/generator/test",
 }
 
 genrule {
@@ -33,7 +33,7 @@ genrule {
     out: ["Hello.client.h"],
     srcs: ["test.proto"],
     tools: ["aprotoc", "protoc-gen-nos-client-cpp"],
-    cmd: GEN_SERVICE_HEADER + "-Iexternal/libnos/generator/test",
+    cmd: GEN_SERVICE_HEADER + "-Iexternal/libnos-hals/generator/test",
 }
 
 genrule {
@@ -41,7 +41,7 @@ genrule {
     out: ["MockHello.client.h"],
     srcs: ["test.proto"],
     tools: ["aprotoc", "protoc-gen-nos-client-cpp"],
-    cmd: GEN_SERVICE_MOCK + "-Iexternal/libnos/generator/test",
+    cmd: GEN_SERVICE_MOCK + "-Iexternal/libnos-hals/generator/test",
 }
 
 cc_test_host {
@@ -60,7 +60,7 @@ cc_test_host {
         type: "full",
         include_dirs: [
             "external/protobuf/src",
-            "external/nos/util/protobuf",
+            "external/libnos/nugget/proto",
         ],
     },
     header_libs: ["nos_headers"],
