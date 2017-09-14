@@ -3,16 +3,6 @@
 Android communicates with Nugget apps in order to implement security related
 HALs. Currently, those HALs are Keymaster, Weaver and OemLock.
 
-## libnos
-
-libnos offers the `NuggetClient` interface that should be used by the HALs.
-`AppClient` is a wrapper around a `NuggetClient` for talking to a specific app.
-
-Nugget can be implemented on a number of chips with different drivers so the
-NuggetClient interface must be implemented for the hardware in use. This
-interface also allows proxing via a synchronizing service and injecting mocks
-for testing.
-
 ### Services
 
 Apps that define a protobuf service will have an app interface class
