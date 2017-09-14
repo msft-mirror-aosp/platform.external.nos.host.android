@@ -16,7 +16,6 @@
 
 subdirs = [
     "citadeld",
-    "generator",
     "hals",
     "manual_tests",
 ]
