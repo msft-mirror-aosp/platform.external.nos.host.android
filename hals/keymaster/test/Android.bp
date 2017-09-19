@@ -14,21 +14,21 @@
 // limitations under the License.
 //
 
-subdirs = [
-    "citadel",
-    "test",
-]
-
-cc_library {
-    name: "android.hardware.keymaster@3.0-impl.nos",
+cc_test {
+    name: "android.hardware.keymaster@3.0-impl.nos_test",
+    generated_headers: ["nos_app_keymaster_service_genc++_mock"],
     srcs: [
-        "KeymasterDevice.cpp",
+        "test.cpp",
     ],
     defaults: ["nos_hal_defaults"],
+    header_libs: ["nos_headers",],
+    static_libs: [
+        "android.hardware.keymaster@3.0-impl.nos",
+        "libgmock",
+    ],
     shared_libs: [
         "android.hardware.keymaster@3.0",
         "libprotobuf-cpp-full",
         "nos_app_keymaster",
     ],
-    export_include_dirs: ["include"],
 }

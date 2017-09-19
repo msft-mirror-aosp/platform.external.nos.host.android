@@ -23,6 +23,9 @@ namespace android {
 namespace hardware {
 namespace keymaster {
 
+// std
+using std::string;
+
 // libhidl
 using ::android::hardware::Void;
 
@@ -30,14 +33,13 @@ using ::android::hardware::Void;
 using ::android::hardware::keymaster::V3_0::KeyCharacteristics;
 
 // Methods from ::android::hardware::keymaster::V3_0::IKeymasterDevice follow.
-Return<void> KeymasterDevice::getHardwareFeatures(getHardwareFeatures_cb _hidl_cb) {
+Return<void> KeymasterDevice::getHardwareFeatures(
+        getHardwareFeatures_cb _hidl_cb) {
     LOG(VERBOSE) << "Running KeymasterDevice::getHardwareFeatures";
 
-    // TODO: implement
-    LOG(ERROR) << "Not implemented";
-    (void) _keymaster;
-
-    _hidl_cb(false, false, false, false, false, {""}, {""});
+    (void)_keymaster;
+    _hidl_cb(true, true, true, true,
+                 true, string("CitadelKeymaster"), string("Google"));
     return Void();
 }
 
