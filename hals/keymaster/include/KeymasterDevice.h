@@ -19,7 +19,7 @@
 
 #include <android/hardware/keymaster/3.0/IKeymasterDevice.h>
 
-#include <nos/AppClient.h>
+#include <Keymaster.client.h>
 
 namespace android {
 namespace hardware {
@@ -33,10 +33,10 @@ using ::android::hardware::keymaster::V3_0::KeyPurpose;
 using ::android::hardware::Return;
 using ::android::hardware::hidl_vec;
 
-using ::nos::AppClient;
+using KeymasterClient = ::nugget::app::keymaster::IKeymaster;
 
 struct KeymasterDevice : public IKeymasterDevice {
-    KeymasterDevice(AppClient& keymasterApp) : _keymasterApp{keymasterApp} {}
+    KeymasterDevice(KeymasterClient& keymaster) : _keymaster{keymaster} {}
     ~KeymasterDevice() override = default;
 
     // Methods from ::android::hardware::keymaster::V3_0::IKeymasterDevice follow.
@@ -72,7 +72,7 @@ struct KeymasterDevice : public IKeymasterDevice {
     Return<ErrorCode> abort(uint64_t operationHandle) override;
 
 private:
-    AppClient& _keymasterApp;
+    KeymasterClient& _keymaster;
 };
 
 }  // namespace keymaster

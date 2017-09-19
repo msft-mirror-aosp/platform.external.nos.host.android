@@ -15,6 +15,7 @@
  */
 
 #include "KeymasterDevice.h"
+#include <Keymaster.client.h>
 
 #include <android-base/logging.h>
 
@@ -34,7 +35,7 @@ Return<void> KeymasterDevice::getHardwareFeatures(getHardwareFeatures_cb _hidl_c
 
     // TODO: implement
     LOG(ERROR) << "Not implemented";
-    (void) _keymasterApp;
+    (void) _keymaster;
 
     _hidl_cb(false, false, false, false, false, {""}, {""});
     return Void();

@@ -23,6 +23,7 @@
 #include <nos/CitadeldProxyClient.h>
 
 #include <KeymasterDevice.h>
+#include <Keymaster.client.h>
 
 using ::android::OK;
 using ::android::sp;
@@ -35,10 +36,12 @@ using ::android::hardware::keymaster::KeymasterDevice;
 using ::nos::CitadeldProxyClient;
 using ::nos::AppClient;
 
+using KeymasterClient = ::nugget::app::keymaster::Keymaster;
+
 int main() {
     LOG(INFO) << "Keymaster HAL service starting";
 
-    // Connect to Citadel
+    // Connect to citadeld
     CitadeldProxyClient citadeldProxy;
     citadeldProxy.open();
     if (!citadeldProxy.isOpen()) {
@@ -50,7 +53,7 @@ int main() {
     configureRpcThreadpool(1, thisThreadWillJoinPool);
 
     // Start the HAL service
-    AppClient keymasterClient{citadeldProxy, APP_ID_KEYMASTER};
+    KeymasterClient keymasterClient{citadeldProxy};
     sp<KeymasterDevice> keymaster = new KeymasterDevice{keymasterClient};
     const status_t status = keymaster->registerAsService();
     if (status != OK) {

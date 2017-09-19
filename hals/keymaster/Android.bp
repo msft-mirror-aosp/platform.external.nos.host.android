@@ -26,7 +26,8 @@ cc_library {
     defaults: ["nos_hal_defaults"],
     shared_libs: [
         "android.hardware.keymaster@3.0",
-        "libnos",
+        "libprotobuf-cpp-full",
+        "nos_app_keymaster",
     ],
     export_include_dirs: ["include"],
 }
