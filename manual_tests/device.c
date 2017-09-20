@@ -26,7 +26,7 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-#include "driver.h"
+#include "device.h"
 
 /*****************************************************************************/
 /* TODO: #include <linux/citadel.h> */
@@ -42,47 +42,9 @@ struct citadel_ioc_tpm_datagram {
 
 #define DEV_CITADEL "/dev/citadel0"
 
-device_t *OpenDev(const char *device)
-{
-	int fd, *new_fd;
-
-	fd = open(device ? device : DEV_CITADEL, O_RDWR);
-	if (fd < 0) {
-		perror("can't open device");
-		return 0;
-	}
-
-	new_fd = (int *)malloc(sizeof(int));
-	if (!new_fd) {
-		perror("can't malloc new fd");
-		close(fd);
-		return 0;
-	}
-	*new_fd = fd;
-	return new_fd;
-}
-
-void CloseDev(device_t *device)
-{
-	int fd;
-
-	if (!device) {
-		fprintf(stderr, "%s: invalid (NULL) device\n", __func__);
-		return;
-	}
-	fd = *(int *)device;
-	if (fd < 0) {
-		fprintf(stderr, "%s: invalid device\n", __func__);
-		return;
-	}
-
-	if (close(fd) < 0)
-		perror("Problem closing device (ignored)");
-	free(device);
-}
-
 static uint8_t in_buf[MAX_DEVICE_TRANSFER];
-int ReadDev(device_t *device, uint32_t command, uint8_t *buf, uint32_t len)
+static int read_datagram(void *ctx, uint32_t command, uint8_t *buf,
+			 uint32_t len)
 {
 	struct citadel_ioc_tpm_datagram dg = {
 		.buf = (unsigned long)in_buf,
@@ -92,11 +54,11 @@ int ReadDev(device_t *device, uint32_t command, uint8_t *buf, uint32_t len)
 	int ret;
 	int fd;
 
-	if (!device) {
+	if (!ctx) {
 		fprintf(stderr, "%s: invalid (NULL) device\n", __func__);
 		return -1;
 	}
-	fd = *(int *)device;
+	fd = *(int *)ctx;
 	if (fd < 0) {
 		fprintf(stderr, "%s: invalid device\n", __func__);
 		return -2;
@@ -120,7 +82,8 @@ int ReadDev(device_t *device, uint32_t command, uint8_t *buf, uint32_t len)
 }
 
 static uint8_t out_buf[MAX_DEVICE_TRANSFER];
-int WriteDev(device_t *device, uint32_t command, uint8_t *buf, uint32_t len)
+static int write_datagram(void *ctx, uint32_t command, const uint8_t *buf,
+			  uint32_t len)
 {
 	struct citadel_ioc_tpm_datagram dg = {
 		.buf = (unsigned long)out_buf,
@@ -130,11 +93,11 @@ int WriteDev(device_t *device, uint32_t command, uint8_t *buf, uint32_t len)
 	int ret;
 	int fd;
 
-	if (!device) {
+	if (!ctx) {
 		fprintf(stderr, "%s: invalid (NULL) device\n", __func__);
 		return -1;
 	}
-	fd = *(int *)device;
+	fd = *(int *)ctx;
 	if (fd < 0) {
 		fprintf(stderr, "%s: invalid device\n", __func__);
 		return -2;
@@ -155,4 +118,47 @@ int WriteDev(device_t *device, uint32_t command, uint8_t *buf, uint32_t len)
 	}
 
 	return 0;
+}
+
+int OpenDev(const char *device, struct nos_device *dev)
+{
+	int fd, *new_fd;
+
+	fd = open(device ? device : DEV_CITADEL, O_RDWR);
+	if (fd < 0) {
+		perror("can't open device");
+		return -1;
+	}
+
+	new_fd = (int *)malloc(sizeof(int));
+	if (!new_fd) {
+		perror("can't malloc new fd");
+		close(fd);
+		return -1;
+	}
+	*new_fd = fd;
+
+	dev->ctx = new_fd;
+	dev->ops.read = read_datagram;
+	dev->ops.write = write_datagram;
+	return 0;
+}
+
+void CloseDev(struct nos_device *device)
+{
+	int fd;
+
+	if (!device || !device->ctx) {
+		fprintf(stderr, "%s: invalid (NULL) device\n", __func__);
+		return;
+	}
+	fd = *(int *)device->ctx;
+	if (fd < 0) {
+		fprintf(stderr, "%s: invalid device\n", __func__);
+		return;
+	}
+
+	if (close(fd) < 0)
+		perror("Problem closing device (ignored)");
+	free(device->ctx);
 }
