@@ -19,8 +19,15 @@ cc_test {
     generated_headers: ["nos_app_keymaster_service_genc++_mock"],
     srcs: [
         "test.cpp",
+        "hal_support.cpp",
+        "import_key_test.cpp",
     ],
     defaults: ["nos_hal_defaults"],
+    cflags: [
+        // Needed for compiling BoringSSL.
+        "-Wno-gnu-anonymous-struct",
+        "-Wno-nested-anon-types",
+    ],
     header_libs: ["nos_headers",],
     static_libs: [
         "android.hardware.keymaster@3.0-impl.nos",
@@ -28,6 +35,7 @@ cc_test {
     ],
     shared_libs: [
         "android.hardware.keymaster@3.0",
+        "libcrypto",
         "libprotobuf-cpp-full",
         "nos_app_keymaster",
     ],

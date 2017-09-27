@@ -15,6 +15,7 @@
  */
 
 #include "KeymasterDevice.h"
+#include "import_key.h"
 #include "proto_utils.h"
 
 #include <Keymaster.client.h>
@@ -214,13 +215,17 @@ Return<void> KeymasterDevice::importKey(
 {
     LOG(VERBOSE) << "Running KeymasterDevice::importKey";
 
+    ErrorCode error;
     ImportKeyRequest request;
     ImportKeyResponse response;
 
-    hidl_params_to_pb(params, request.mutable_params());
-    // TODO: serialize into ImportKeyRequest proto.
-    (void)keyFormat;
-    (void)keyData;
+    error = import_key_request(params, keyFormat, keyData, &request);
+    if (error != ErrorCode::OK) {
+        LOG(ERROR) << "ImportKey request parsing failed with error "
+                   << (uint32_t)error;
+        _hidl_cb(error, hidl_vec<uint8_t>{}, KeyCharacteristics{});
+        return Void();
+    }
 
     KM_CALLV(ImportKey, hidl_vec<uint8_t>{}, KeyCharacteristics{});
 
@@ -231,8 +236,12 @@ Return<void> KeymasterDevice::importKey(
         response.blob().blob().size(), false);
 
     KeyCharacteristics characteristics;
-    pb_to_hidl_params(response.characteristics().tee_enforced(),
-                      &characteristics.teeEnforced);
+    error = pb_to_hidl_params(response.characteristics().tee_enforced(),
+                              &characteristics.teeEnforced);
+    if (error != ErrorCode::OK) {
+        LOG(ERROR) << "KeymasterDevice::importKey: response tee_enforced :"
+                   << (uint32_t)error;
+    }
 
     _hidl_cb(ErrorCode::OK, blob, characteristics);
     return Void();
