@@ -23,6 +23,7 @@ cc_library {
     name: "android.hardware.keymaster@3.0-impl.nos",
     srcs: [
         "KeymasterDevice.cpp",
+        "proto_utils.cpp",
     ],
     defaults: ["nos_hal_defaults"],
     shared_libs: [
