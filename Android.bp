@@ -30,6 +30,9 @@ cc_defaults {
         "-Wextra",
         "-Werror",
     ],
+    conlyflags: [
+        "-std=c11",
+    ],
 }
 
 // Language and vendor related defaults

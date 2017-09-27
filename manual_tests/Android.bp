@@ -24,6 +24,10 @@ cc_defaults {
 
 cc_binary {
     name: "test_citadel",
-    srcs: ["test_citadel.c", "driver.c", "transport.c"],
+    srcs: ["test_citadel.c", "device.c"],
     defaults: ["manual_tests_cc_defaults"],
+    shared_libs: [
+        "libnos_datagram",
+        "libnos_transport",
+    ],
 }
