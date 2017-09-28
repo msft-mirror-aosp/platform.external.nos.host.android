@@ -805,10 +805,13 @@ static void do_test(void)
 	else
 		ap_wiggle(&dev, 8, 126);
 
+	/* Wiggle physical buttons? */
 	if (option.buttons) {
 
-		/* These are connected to physical switches. */
-		phys_wiggle(&dev, 0, "Power");
+		if (option.binder)
+			/* We had to cut this trace on proto1 (b/66976641) */
+			phys_wiggle(&dev, 0, "Power");
+
 		phys_wiggle(&dev, 1, "Volume Down");
 		phys_wiggle(&dev, 2, "Volume Up");
 
