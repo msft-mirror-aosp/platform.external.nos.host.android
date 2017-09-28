@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -657,11 +658,21 @@ static void ap_wiggle(const struct nos_device *dev, uint32_t cit_gpio,
 		      __func__, prev, curr);
 }
 
+static int stopped;
+static void sig_handler(int sig)
+{
+	stopped = 1;
+	printf("Signal %d recognized\n", sig);
+}
+
 static void phys_wiggle(const struct nos_device *dev, uint32_t cit_gpio,
 			const char *button)
 {
 	uint32_t prev, curr;
 	uint32_t cit_bit;
+
+	stopped = 0;
+	signal(SIGINT, sig_handler);
 
 	cit_bit = (1 << cit_gpio);
 
@@ -682,7 +693,7 @@ static void phys_wiggle(const struct nos_device *dev, uint32_t cit_gpio,
 			Error("%s: can't read Citadel GPIOs", __func__);
 			return;
 		}
-	} while (prev == curr);
+	} while (prev == curr && !stopped);
 	debug(1, "new value 0x%08x\n", curr);
 	if ((prev ^ curr) != cit_bit)
 		Error("%s: multiple cit_gpios changed: prev 0x%08x cur 0x%08x",
@@ -696,11 +707,13 @@ static void phys_wiggle(const struct nos_device *dev, uint32_t cit_gpio,
 			Error("%s: can't read Citadel GPIOs", __func__);
 			return;
 		}
-	} while (prev == curr);
+	} while (prev == curr && !stopped);
 	debug(1, "new value 0x%08x\n", curr);
 	if ((prev ^ curr) != cit_bit)
 		Error("%s: multiple cit_gpios changed: prev 0x%08x cur 0x%08x",
 		      __func__, prev, curr);
+
+	signal(SIGINT, SIG_DFL);
 }
 
 static const uint8_t expected_tpm_did_vid[] = {
@@ -780,10 +793,10 @@ static void do_test(void)
 	if (value != 0x00000000)
 		Error("GPIO direction = 0x%08x\n", value);
 
-	ap_wiggle(&dev, 4, 76);     /* Citadel GPIO 4 AP_SEC_STATE   is AP GPIO 76 */
-	ap_wiggle(&dev, 5, 69);     /* Citadel GPIO 5 AP_PWR_STATE   is AP GPIO 69 */
-	ap_wiggle(&dev, 6, 94);     /* Citadel GPIO 6 AP_CTDL_IRQ    is AP GPIO 94 */
-	ap_wiggle(&dev, 7, 96);     /* Citadel GPIO 7 CTDL_AP_IRQ    is AP GPIO 96 */
+	ap_wiggle(&dev, 4, 76);	/* Citadel GPIO 4 AP_SEC_STATE is AP GPIO 76 */
+	ap_wiggle(&dev, 5, 69);	/* Citadel GPIO 5 AP_PWR_STATE is AP GPIO 69 */
+	ap_wiggle(&dev, 6, 94);	/* Citadel GPIO 6 AP_CTDL_IRQ  is AP GPIO 94 */
+	ap_wiggle(&dev, 7, 96);	/* Citadel GPIO 7 CTDL_AP_IRQ  is AP GPIO 96 */
 
 	/* Citadel GPIO 8 CCD_CABLE_DET is AP GPIO 126 */
 	if (option.binder)
