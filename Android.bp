@@ -15,6 +15,7 @@
 //
 
 subdirs = [
+    "citadel",
     "citadeld",
     "hals",
     "manual_tests",

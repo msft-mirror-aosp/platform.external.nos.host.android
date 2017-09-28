@@ -13,15 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef MANUAL_TESTS_DEVICE_H
-#define MANUAL_TESTS_DEVICE_H
+
+#ifndef NOS_ANDROID_CITADEL_H
+#define NOS_ANDROID_CITADEL_H
 
 #include <nos/device.h>
 
-/* Use /dev/citadel0 if devicename is NULL */
-int OpenDev(const char *devicename, struct nos_device *dev);
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-/* Guess */
-void CloseDev(struct nos_device *);
+/*
+ * Open a connection to a Nugget device.
+ *
+ * Returns 0 on success or negative on failure.
+ */
+int nos_android_citadel_device_open(const char* device_name, struct nos_device *dev);
 
-#endif	/* MANUAL_TESTS_DEVICE_H */
+/*
+ * Close the connection to a Nugget device.
+ */
+void nos_android_citadel_device_close(struct nos_device *dev);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* NOS_ANDROID_CITADEL_H */

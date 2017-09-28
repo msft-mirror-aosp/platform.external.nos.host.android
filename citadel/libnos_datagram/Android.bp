@@ -14,22 +14,12 @@
 // limitations under the License.
 //
 
-cc_defaults {
-    name: "manual_tests_cc_defaults",
-    defaults: ["nos_cc_defaults"],
-    header_libs: [
-        "nos_headers",
-    ],
-}
-
-cc_binary {
-    name: "test_citadel",
-    srcs: ["test_citadel.c"],
-    defaults: ["manual_tests_cc_defaults"],
-    static_libs: [
+cc_library {
+    name: "libnos_datagram_citadel",
+    srcs: ["citadel.c"],
+    defaults: ["nos_shared_cc_defaults"],
+    shared_libs: [
         "libnos_datagram",
-        "libnos_datagram_citadel",
-        "libnos_transport",
-        "liblog",
     ],
+    export_include_dirs: ["include"],
 }

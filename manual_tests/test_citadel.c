@@ -17,7 +17,7 @@
 #include <app_nugget.h>
 
 #include <nos/transport.h>
-#include "device.h"
+#include <nos/android/citadel.h>
 
 /* Opened here for use in transport.c */
 int verbose;
@@ -247,7 +247,7 @@ static void do_tpm(int argc, char *argv[])
 	}
 
 	/* Okay, let's do something */
-	if (OpenDev(option.device, &dev) != 0) {
+	if (nos_android_citadel_device_open(option.device, &dev) != 0) {
 		Error("Unable to connect");
 		return;
 	}
@@ -265,7 +265,7 @@ static void do_tpm(int argc, char *argv[])
 		debug_buf(0, buf, buflen);
 
 	/* Done */
-	CloseDev(&dev);
+	nos_android_citadel_device_close(&dev);
 }
 
 static void do_app(int argc, char *argv[])
@@ -288,7 +288,7 @@ static void do_app(int argc, char *argv[])
 	}
 
 	/* Okay, let's do something */
-	if (OpenDev(option.device, &dev) != 0) {
+	if (nos_android_citadel_device_open(option.device, &dev) != 0) {
 		Error("Unable to connect");
 		return;
 	}
@@ -304,7 +304,7 @@ static void do_app(int argc, char *argv[])
 	debug_buf(0, buf, replycount);
 
 	/* Done */
-	CloseDev(&dev);
+	nos_android_citadel_device_close(&dev);
 }
 
 
@@ -382,7 +382,7 @@ static void do_rw(int argc, char *argv[])
 	}
 
 	/* Okay, let's do something */
-	if (OpenDev(option.device, &dev) != 0) {
+	if (nos_android_citadel_device_open(option.device, &dev) != 0) {
 		Error("Unable to connect");
 		return;
 	}
@@ -399,7 +399,7 @@ static void do_rw(int argc, char *argv[])
 			Error("%s: Write failed", argv[0]);
 	}
 
-	CloseDev(&dev);
+	nos_android_citadel_device_close(&dev);
 }
 
 /****************************************************************************/
@@ -727,7 +727,7 @@ static void do_test(void)
 	struct nos_device dev;
 
 	printf("\nOpening connection...\n");
-	if (OpenDev(option.device, &dev) != 0) {
+	if (nos_android_citadel_device_open(option.device, &dev) != 0) {
 		Error("Unable to connect to the SPI driver");
 		goto out;
 	}
@@ -829,7 +829,7 @@ static void do_test(void)
 	 */
 
 done:
-	CloseDev(&dev);
+	nos_android_citadel_device_close(&dev);
 out:
 	if (errorcnt)
 		printf("\nFAIL FAIL FAIL\n\n");
