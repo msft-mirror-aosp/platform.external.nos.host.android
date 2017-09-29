@@ -47,7 +47,7 @@ Return<void> Weaver::getConfig(getConfig_cb _hidl_cb) {
 
     GetConfigRequest request;
     GetConfigResponse response;
-    const uint32_t appStatus = _weaver.GetConfig(request, response);
+    const uint32_t appStatus = _weaver.GetConfig(request, &response);
 
     if (appStatus != APP_SUCCESS) {
         LOG(ERROR) << "App GetConfig request failed with status " << appStatus;
@@ -69,7 +69,7 @@ Return<WeaverStatus> Weaver::write(uint32_t slotId, const hidl_vec<uint8_t>& key
     request.set_key(key.data(), key.size());
     request.set_value(value.data(), value.size());
     WriteResponse response;
-    const uint32_t appStatus = _weaver.Write(request, response);
+    const uint32_t appStatus = _weaver.Write(request, &response);
 
     if (appStatus != APP_SUCCESS) {
         LOG(ERROR) << "App Write request failed with status " << appStatus;
@@ -86,7 +86,7 @@ Return<void> Weaver::read(uint32_t slotId, const hidl_vec<uint8_t>& key, read_cb
     request.set_slot(slotId);
     request.set_key(key.data(), key.size());
     ReadResponse response;
-    const uint32_t appStatus = _weaver.Read(request, response);
+    const uint32_t appStatus = _weaver.Read(request, &response);
 
     if (appStatus != APP_SUCCESS) {
         LOG(ERROR) << "App Read request failed with status " << appStatus;

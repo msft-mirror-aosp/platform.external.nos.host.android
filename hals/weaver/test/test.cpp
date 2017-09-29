@@ -24,7 +24,7 @@ using ::testing::DoAll;
 using ::testing::Eq;
 using ::testing::Pointwise;
 using ::testing::Return;
-using ::testing::SetArgReferee;
+using ::testing::SetArgPointee;
 
 using ::android::hardware::hidl_vec;
 using ::android::hardware::weaver::Weaver;
@@ -48,7 +48,7 @@ TEST(WeaverHalTest, getConfigReturnsValuesFromApp) {
     response.set_key_size(467);
     response.set_value_size(9);
     EXPECT_CALL(mockService, GetConfig(_, _))
-            .WillOnce(DoAll(SetArgReferee<1>(response), Return(APP_SUCCESS)));
+            .WillOnce(DoAll(SetArgPointee<1>(response), Return(APP_SUCCESS)));
 
     Weaver hal{mockService};
     hal.getConfig([&](WeaverStatus status, WeaverConfig config) {
@@ -143,7 +143,7 @@ TEST(WeaverHalTest, readSucceedsIfAppSucceeds) {
     response.set_error(ReadResponse::NONE);
     response.set_value("turn me into bytes");
     EXPECT_CALL(mockService, Read(_, _))
-            .WillOnce(DoAll(SetArgReferee<1>(response), Return(APP_SUCCESS)));
+            .WillOnce(DoAll(SetArgPointee<1>(response), Return(APP_SUCCESS)));
 
     Weaver hal{mockService};
     hal.read(0, hidl_vec<uint8_t>{}, [&](WeaverReadStatus status, WeaverReadResponse r) {
@@ -160,7 +160,7 @@ TEST(WeaverHalTest, readPropagatesWrongKey) {
     response.set_error(ReadResponse::WRONG_KEY);
     response.set_throttle_msec(5649);
     EXPECT_CALL(mockService, Read(_, _))
-            .WillOnce(DoAll(SetArgReferee<1>(response), Return(APP_SUCCESS)));
+            .WillOnce(DoAll(SetArgPointee<1>(response), Return(APP_SUCCESS)));
 
     Weaver hal{mockService};
     hal.read(0, hidl_vec<uint8_t>{}, [&](WeaverReadStatus status, WeaverReadResponse r) {
@@ -177,7 +177,7 @@ TEST(WeaverHalTest, readPropagatesThrottle) {
     response.set_error(ReadResponse::THROTTLE);
     response.set_throttle_msec(946);
     EXPECT_CALL(mockService, Read(_, _))
-            .WillOnce(DoAll(SetArgReferee<1>(response), Return(APP_SUCCESS)));
+            .WillOnce(DoAll(SetArgPointee<1>(response), Return(APP_SUCCESS)));
 
     Weaver hal{mockService};
     hal.read(0, hidl_vec<uint8_t>{}, [&](WeaverReadStatus status, WeaverReadResponse r) {
@@ -193,7 +193,7 @@ TEST(WeaverHalTest, readFailsOnInvalidErrorCode) {
     ReadResponse response;
     response.set_error(static_cast<::nugget::app::weaver::ReadResponse_Error>(9999));
     EXPECT_CALL(mockService, Read(_, _))
-            .WillOnce(DoAll(SetArgReferee<1>(response), Return(APP_SUCCESS)));
+            .WillOnce(DoAll(SetArgPointee<1>(response), Return(APP_SUCCESS)));
 
     Weaver hal{mockService};
     hal.read(0, hidl_vec<uint8_t>{}, [](WeaverReadStatus status, WeaverReadResponse r) {

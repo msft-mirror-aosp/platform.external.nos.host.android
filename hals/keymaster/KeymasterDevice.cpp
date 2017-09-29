@@ -97,34 +97,34 @@ static ErrorCode status_to_error_code(uint32_t status)
     }
 }
 
-#define KM_CALL(meth) {                                          \
-    const uint32_t status = _keymaster. meth (request, response); \
-    if (status != APP_SUCCESS) {                                  \
-        LOG(ERROR) << #meth << " : request failed with status: "  \
-                   << NuggetClient::StatusCodeString(status);     \
-        return status_to_error_code(status);                      \
-    }                                                             \
-    if ((ErrorCode)response.error_code() != ErrorCode::OK) {      \
-        LOG(ERROR) << #meth << " : device response error code: "  \
-                   << response.error_code();                      \
-        return (ErrorCode)response.error_code();                  \
-    }                                                             \
+#define KM_CALL(meth) {                                            \
+    const uint32_t status = _keymaster. meth (request, &response); \
+    if (status != APP_SUCCESS) {                                   \
+        LOG(ERROR) << #meth << " : request failed with status: "   \
+                   << NuggetClient::StatusCodeString(status);      \
+        return status_to_error_code(status);                       \
+    }                                                              \
+    if ((ErrorCode)response.error_code() != ErrorCode::OK) {       \
+        LOG(ERROR) << #meth << " : device response error code: "   \
+                   << response.error_code();                       \
+        return (ErrorCode)response.error_code();                   \
+    }                                                              \
 }
 
-#define KM_CALLV(meth, ...) {                                     \
-    const uint32_t status = _keymaster. meth (request, response); \
-    if (status != APP_SUCCESS) {                                  \
-        LOG(ERROR) << #meth << " : request failed with status: "  \
-                   << NuggetClient::StatusCodeString(status);     \
-        _hidl_cb(status_to_error_code(status), __VA_ARGS__);      \
-        return Void();                                            \
-    }                                                             \
-    if ((ErrorCode)response.error_code() != ErrorCode::OK) {      \
-        LOG(ERROR) << #meth << " : device response error code: "  \
-                   << response.error_code();                      \
-        _hidl_cb((ErrorCode)response.error_code(), __VA_ARGS__);  \
-        return Void();                                            \
-    }                                                             \
+#define KM_CALLV(meth, ...) {                                      \
+    const uint32_t status = _keymaster. meth (request, &response); \
+    if (status != APP_SUCCESS) {                                   \
+        LOG(ERROR) << #meth << " : request failed with status: "   \
+                   << NuggetClient::StatusCodeString(status);      \
+        _hidl_cb(status_to_error_code(status), __VA_ARGS__);       \
+        return Void();                                             \
+    }                                                              \
+    if ((ErrorCode)response.error_code() != ErrorCode::OK) {       \
+        LOG(ERROR) << #meth << " : device response error code: "   \
+                   << response.error_code();                       \
+        _hidl_cb((ErrorCode)response.error_code(), __VA_ARGS__);   \
+        return Void();                                             \
+    }                                                              \
 }
 
 // Methods from ::android::hardware::keymaster::V3_0::IKeymasterDevice follow.

@@ -39,7 +39,7 @@ using ::testing::Matcher;
 using ::testing::MatcherInterface;
 using ::testing::MatchResultListener;
 using ::testing::Return;
-using ::testing::SetArgReferee;
+using ::testing::SetArgPointee;
 
 // Hardware
 using ::android::hardware::hidl_vec;
@@ -370,7 +370,7 @@ TEST(KeymasterHalTest, importKeyPKCS8Success) {
     EXPECT_CALL(
         mockService,
         ImportKey(ImportKeyRequestEq(hidl_vec<KeyParameter>{kp}, rsa.get()), _))
-        .WillOnce(DoAll(SetArgReferee<1>(response), Return(APP_SUCCESS)));
+        .WillOnce(DoAll(SetArgPointee<1>(response), Return(APP_SUCCESS)));
 
     KeymasterDevice hal{mockService};
     hal.importKey(

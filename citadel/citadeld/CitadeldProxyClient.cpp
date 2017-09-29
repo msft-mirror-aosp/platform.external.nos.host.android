@@ -32,28 +32,28 @@ using ::android::hardware::citadel::ICitadeld;
 namespace nos {
 
 CitadeldProxyClient::~CitadeldProxyClient() {
-    close();
+    Close();
 }
 
-void CitadeldProxyClient::open() {
+void CitadeldProxyClient::Open() {
     // Ensure this process is using the vndbinder
     ProcessState::initWithDriver("/dev/vndbinder");
     _citadeld = ICitadeld::asInterface(defaultServiceManager()->getService(ICitadeld::descriptor));
 }
 
-void CitadeldProxyClient::close() {
+void CitadeldProxyClient::Close() {
     _citadeld.clear();
 }
 
-bool CitadeldProxyClient::isOpen() {
+bool CitadeldProxyClient::IsOpen() const {
     return _citadeld != nullptr;
 }
 
-uint32_t CitadeldProxyClient::callApp(uint32_t appId, uint16_t arg,
+uint32_t CitadeldProxyClient::CallApp(uint32_t appId, uint16_t arg,
                                       const std::vector<uint8_t>& request,
-                                      std::vector<uint8_t>& response) {
+                                      std::vector<uint8_t>* response) {
     uint32_t appStatus;
-    Status status = _citadeld->callApp(appId, arg, request, &response,
+    Status status = _citadeld->callApp(appId, arg, request, response,
                                        reinterpret_cast<int32_t*>(&appStatus));
     if (status.isOk()) {
         return appStatus;

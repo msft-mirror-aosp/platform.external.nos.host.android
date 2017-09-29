@@ -59,7 +59,7 @@ struct CitadelProxy : public BnCitadeld {
         const uint16_t arg =  static_cast<uint16_t>(_arg);
         uint32_t* const appStatus = reinterpret_cast<uint32_t*>(_aidl_return);
 
-        *appStatus = _client.callApp(appId, arg, request, *response);
+        *appStatus = _client.CallApp(appId, arg, request, response);
         return Status::ok();
     }
 };
@@ -71,8 +71,8 @@ int main() {
 
     // Connect to Citadel
     CitadelClient citadel;
-    citadel.open();
-    if (!citadel.isOpen()) {
+    citadel.Open();
+    if (!citadel.IsOpen()) {
         LOG(FATAL) << "Failed to open Citadel client";
     }
 

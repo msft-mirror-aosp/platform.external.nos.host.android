@@ -40,8 +40,8 @@ int main() {
 
     // Connect to Citadel
     CitadeldProxyClient citadeldProxy;
-    citadeldProxy.open();
-    if (!citadeldProxy.isOpen()) {
+    citadeldProxy.Open();
+    if (!citadeldProxy.IsOpen()) {
         LOG(FATAL) << "Failed to open citadeld client";
     }
 
