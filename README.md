@@ -21,14 +21,6 @@ desired. Support for this could be added in:
    * `NuggetClient` on top of `call_application()`
    * Generated services
 
-## citadeld
+## `citadel`
 
-Citadel will be running Nugget. In order to synchronize access to the driver /
-bus, HALs should proxy all communication via the `citadeld` daemon which will be
-the only service with driver access.
-
-Synchronizing with this service, rather than in the driver, allows for easier
-debugging and fixing should the need arise.
-
-`CitadeldProxyClient` will implement `NuggetClient` to handle proxying
-communication via `citadeld` without requiring change to the HALs.
+This directory contains the components to support Citadel connected to Android.

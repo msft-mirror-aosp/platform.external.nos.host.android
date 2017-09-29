@@ -15,5 +15,6 @@
 //
 
 subdirs = [
+    "citadeld",
     "libnos_datagram",
 ]
