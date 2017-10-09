@@ -26,7 +26,6 @@ cc_library {
     defaults: ["nos_hal_defaults"],
     shared_libs: [
         "android.hardware.oemlock@1.0",
-        "libnos",
     ],
     export_include_dirs: ["include"],
 }

@@ -20,10 +20,12 @@ cc_defaults {
         "aidl/android/hardware/citadel/ICitadeld.aidl",
     ],
     defaults: ["nos_cc_defaults"],
+    header_libs: [
+        "libnos_headers",
+    ],
     shared_libs: [
         "libbase",
         "libbinder",
-        "libnos",
         "libutils",
     ],
 }
@@ -36,7 +38,7 @@ cc_binary {
     ],
     defaults: ["citadeld_defaults"],
     shared_libs: [
-        "libnos_citadel",
+        "libnos",
     ],
 }
 

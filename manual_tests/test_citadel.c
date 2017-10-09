@@ -16,8 +16,8 @@
 #include <application.h>
 #include <app_nugget.h>
 
+#include <nos/device.h>
 #include <nos/transport.h>
-#include <nos/android/citadel.h>
 
 /* Opened here for use in transport.c */
 int verbose;
@@ -247,7 +247,7 @@ static void do_tpm(int argc, char *argv[])
 	}
 
 	/* Okay, let's do something */
-	if (nos_android_citadel_device_open(option.device, &dev) != 0) {
+	if (nos_device_open(option.device, &dev) != 0) {
 		Error("Unable to connect");
 		return;
 	}
@@ -265,7 +265,7 @@ static void do_tpm(int argc, char *argv[])
 		debug_buf(0, buf, buflen);
 
 	/* Done */
-	nos_android_citadel_device_close(&dev);
+	dev.ops.close(dev.ctx);
 }
 
 static void do_app(int argc, char *argv[])
@@ -288,7 +288,7 @@ static void do_app(int argc, char *argv[])
 	}
 
 	/* Okay, let's do something */
-	if (nos_android_citadel_device_open(option.device, &dev) != 0) {
+	if (nos_device_open(option.device, &dev) != 0) {
 		Error("Unable to connect");
 		return;
 	}
@@ -304,7 +304,7 @@ static void do_app(int argc, char *argv[])
 	debug_buf(0, buf, replycount);
 
 	/* Done */
-	nos_android_citadel_device_close(&dev);
+	dev.ops.close(dev.ctx);
 }
 
 
@@ -382,7 +382,7 @@ static void do_rw(int argc, char *argv[])
 	}
 
 	/* Okay, let's do something */
-	if (nos_android_citadel_device_open(option.device, &dev) != 0) {
+	if (nos_device_open(option.device, &dev) != 0) {
 		Error("Unable to connect");
 		return;
 	}
@@ -399,7 +399,7 @@ static void do_rw(int argc, char *argv[])
 			Error("%s: Write failed", argv[0]);
 	}
 
-	nos_android_citadel_device_close(&dev);
+	dev.ops.close(dev.ctx);
 }
 
 /****************************************************************************/
@@ -727,7 +727,7 @@ static void do_test(void)
 	struct nos_device dev;
 
 	printf("\nOpening connection...\n");
-	if (nos_android_citadel_device_open(option.device, &dev) != 0) {
+	if (nos_device_open(option.device, &dev) != 0) {
 		Error("Unable to connect to the SPI driver");
 		goto out;
 	}
@@ -829,7 +829,7 @@ static void do_test(void)
 	 */
 
 done:
-	nos_android_citadel_device_close(&dev);
+	dev.ops.close(dev.ctx);
 out:
 	if (errorcnt)
 		printf("\nFAIL FAIL FAIL\n\n");

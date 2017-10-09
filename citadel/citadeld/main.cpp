@@ -20,7 +20,7 @@
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 
-#include <nos/CitadelClient.h>
+#include <nos/NuggetClient.h>
 
 #include <android/hardware/citadel/BnCitadeld.h>
 
@@ -34,8 +34,8 @@ using ::android::ProcessState;
 
 using ::android::binder::Status;
 
-using ::nos::CitadelClient;
 using ::nos::NuggetClient;
+using ::nos::NuggetClientInterface;
 
 using ::android::hardware::citadel::BnCitadeld;
 using ::android::hardware::citadel::ICitadeld;
@@ -43,9 +43,9 @@ using ::android::hardware::citadel::ICitadeld;
 namespace {
 
 struct CitadelProxy : public BnCitadeld {
-    NuggetClient& _client;
+    NuggetClientInterface& _client;
 
-    CitadelProxy(NuggetClient& client) : _client{client} {}
+    CitadelProxy(NuggetClientInterface& client) : _client{client} {}
     ~CitadelProxy() override = default;
 
     Status callApp(const int32_t _appId, const int32_t _arg, const std::vector<uint8_t>& request,
@@ -70,7 +70,7 @@ int main() {
     LOG(INFO) << "Starting citadeld";
 
     // Connect to Citadel
-    CitadelClient citadel;
+    NuggetClient citadel;
     citadel.Open();
     if (!citadel.IsOpen()) {
         LOG(FATAL) << "Failed to open Citadel client";

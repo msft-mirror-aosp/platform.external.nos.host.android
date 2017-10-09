@@ -19,6 +19,7 @@
 #include "proto_utils.h"
 
 #include <Keymaster.client.h>
+#include <nos/debug.h>
 #include <nos/NuggetClient.h>
 
 #include <android-base/logging.h>
@@ -101,7 +102,7 @@ static ErrorCode status_to_error_code(uint32_t status)
     const uint32_t status = _keymaster. meth (request, &response); \
     if (status != APP_SUCCESS) {                                   \
         LOG(ERROR) << #meth << " : request failed with status: "   \
-                   << NuggetClient::StatusCodeString(status);      \
+                   << nos::StatusCodeString(status);               \
         return status_to_error_code(status);                       \
     }                                                              \
     if ((ErrorCode)response.error_code() != ErrorCode::OK) {       \
@@ -115,7 +116,7 @@ static ErrorCode status_to_error_code(uint32_t status)
     const uint32_t status = _keymaster. meth (request, &response); \
     if (status != APP_SUCCESS) {                                   \
         LOG(ERROR) << #meth << " : request failed with status: "   \
-                   << NuggetClient::StatusCodeString(status);      \
+                   << nos::StatusCodeString(status);               \
         _hidl_cb(status_to_error_code(status), __VA_ARGS__);       \
         return Void();                                             \
     }                                                              \

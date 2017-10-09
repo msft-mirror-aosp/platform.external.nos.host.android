@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include <nos/android/citadel.h>
+#include <nos/device.h>
 
 #include <ctype.h>
 #include <errno.h>
@@ -117,7 +117,25 @@ static int write_datagram(void *ctx, uint32_t command, const uint8_t *buf, uint3
     return 0;
 }
 
-int nos_android_citadel_device_open(const char *device_name, struct nos_device *dev) {
+static void close_device(void *ctx) {
+    int fd;
+
+    if (!ctx) {
+        fprintf(stderr, "%s: invalid (NULL) device\n", __func__);
+        return;
+    }
+    fd = *(int *)ctx;
+    if (fd < 0) {
+        fprintf(stderr, "%s: invalid device\n", __func__);
+        return;
+    }
+
+    if (close(fd) < 0)
+        perror("Problem closing device (ignored)");
+    free(ctx);
+}
+
+int nos_device_open(const char *device_name, struct nos_device *dev) {
     int fd, *new_fd;
 
     fd = open(device_name ? device_name : DEV_CITADEL, O_RDWR);
@@ -137,23 +155,6 @@ int nos_android_citadel_device_open(const char *device_name, struct nos_device *
     dev->ctx = new_fd;
     dev->ops.read = read_datagram;
     dev->ops.write = write_datagram;
+    dev->ops.close = close_device;
     return 0;
-}
-
-void nos_android_citadel_device_close(struct nos_device *dev) {
-    int fd;
-
-    if (!dev || !dev->ctx) {
-        fprintf(stderr, "%s: invalid (NULL) device\n", __func__);
-        return;
-    }
-    fd = *(int *)dev->ctx;
-    if (fd < 0) {
-        fprintf(stderr, "%s: invalid device\n", __func__);
-        return;
-    }
-
-    if (close(fd) < 0)
-        perror("Problem closing device (ignored)");
-    free(dev->ctx);
 }

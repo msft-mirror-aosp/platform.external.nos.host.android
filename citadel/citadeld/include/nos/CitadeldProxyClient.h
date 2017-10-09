@@ -20,7 +20,7 @@
 #include <cstdint>
 #include <vector>
 
-#include <nos/NuggetClient.h>
+#include <nos/NuggetClientInterface.h>
 
 #include <android/hardware/citadel/ICitadeld.h>
 
@@ -30,7 +30,7 @@ namespace nos {
  * Implementation of NuggetClient to proxy calls via the citadeld synchronizing
  * daemon which coordinates communication between the HALs and Citadel.
  */
-class CitadeldProxyClient : public NuggetClient {
+class CitadeldProxyClient : public NuggetClientInterface {
     ::android::sp<::android::hardware::citadel::ICitadeld> _citadeld;
 
 public:

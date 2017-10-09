@@ -21,5 +21,4 @@ cc_library {
     shared_libs: [
         "libnos_datagram",
     ],
-    export_include_dirs: ["include"],
 }
