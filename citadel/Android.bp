@@ -18,3 +18,10 @@ subdirs = [
     "citadeld",
     "libnos_datagram",
 ]
+
+cc_library {
+    name: "libnos_client_citadel",
+    srcs: [":libnos_client"],
+    defaults: ["libnos_client_defaults"],
+    shared_libs: ["libnos_datagram_citadel"],
+}
