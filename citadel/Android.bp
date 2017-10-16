@@ -22,6 +22,9 @@ subdirs = [
 cc_library {
     name: "libnos_client_citadel",
     srcs: [":libnos_client"],
-    defaults: ["libnos_client_defaults"],
+    defaults: [
+        "libnos_client_defaults",
+        "nos_cc_defaults",
+    ],
     shared_libs: ["libnos_datagram_citadel"],
 }
