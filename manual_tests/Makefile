@@ -17,7 +17,7 @@
 # This lets us build simple apps that talk to a Citadel dev board.
 #
 
-PROGS = test_citadel
+PROGS = test_citadel citadel_updater
 
 # Assumes a full Nugget OS source tree
 NOS_ROOT = $(realpath ../../..)
@@ -43,8 +43,8 @@ endif
 CFLAGS += -Wall -Werror
 CFLAGS += $(foreach I,$(INCDIRS),-I$(I))
 
-CFLAGS += $(shell pkg-config --cflags libftdi)
-LDFLAGS += $(shell pkg-config --libs libftdi)
+CFLAGS += $(shell pkg-config --cflags libftdi libcrypto)
+LDFLAGS += $(shell pkg-config --libs libftdi libcrypto)
 
 % : %.c $(EXT_SRCS)
 	$(CC) $(CFLAGS) $^ $(LDFLAGS) -o $@
