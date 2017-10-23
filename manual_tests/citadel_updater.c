@@ -318,7 +318,7 @@ int main(int argc, char *argv[])
 	int i;
 	int idx = 0;
 	char *this_prog;
-	uint8_t *image;
+	uint8_t *image = 0;
 	uint32_t imagesize = 0 ;
 	int got_action = 0;
 	struct nos_device dev;
@@ -387,6 +387,7 @@ int main(int argc, char *argv[])
 
 	if (option.ro || option.rw) {
 		if (optind < argc)
+			/* Sets errorcnt on failure */
 			image = read_image_from_file(argv[optind], &imagesize);
 		else
 			Error("An image file is required with --ro and --rw");
