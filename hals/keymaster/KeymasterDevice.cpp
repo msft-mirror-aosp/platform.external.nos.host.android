@@ -166,17 +166,23 @@ Return<void> KeymasterDevice::generateKey(
     GenerateKeyRequest request;
     GenerateKeyResponse response;
 
-    hidl_params_to_pb(keyParams, request.mutable_params());
+    hidl_vec<uint8_t> blob;
+    KeyCharacteristics characteristics;
+    if (hidl_params_to_pb(
+            keyParams, request.mutable_params()) != ErrorCode::OK) {
+      _hidl_cb(ErrorCode::INVALID_ARGUMENT, blob, characteristics);
+      return Void();
+    }
 
     // Call device.
     KM_CALLV(GenerateKey, hidl_vec<uint8_t>{}, KeyCharacteristics());
 
-    hidl_vec<uint8_t> blob;
-    KeyCharacteristics characteristics;
     blob.setToExternal(
         reinterpret_cast<uint8_t*>(
             const_cast<char*>(response.blob().blob().data())),
         response.blob().blob().size(), false);
+    pb_to_hidl_params(response.characteristics().software_enforced(),
+                      &characteristics.softwareEnforced);
     pb_to_hidl_params(response.characteristics().tee_enforced(),
                       &characteristics.teeEnforced);
 
@@ -203,6 +209,8 @@ Return<void> KeymasterDevice::getKeyCharacteristics(
     KM_CALLV(GetKeyCharacteristics, KeyCharacteristics());
 
     KeyCharacteristics characteristics;
+    pb_to_hidl_params(response.characteristics().software_enforced(),
+                      &characteristics.softwareEnforced);
     pb_to_hidl_params(response.characteristics().tee_enforced(),
                       &characteristics.teeEnforced);
 
@@ -237,6 +245,8 @@ Return<void> KeymasterDevice::importKey(
         response.blob().blob().size(), false);
 
     KeyCharacteristics characteristics;
+    pb_to_hidl_params(response.characteristics().software_enforced(),
+                      &characteristics.softwareEnforced);
     error = pb_to_hidl_params(response.characteristics().tee_enforced(),
                               &characteristics.teeEnforced);
     if (error != ErrorCode::OK) {
@@ -286,11 +296,16 @@ Return<void> KeymasterDevice::attestKey(
     AttestKeyResponse response;
 
     request.mutable_blob()->set_blob(&keyToAttest[0], keyToAttest.size());
-    hidl_params_to_pb(attestParams, request.mutable_params());
+
+    vector<hidl_vec<uint8_t> > chain;
+    if (hidl_params_to_pb(
+            attestParams, request.mutable_params()) != ErrorCode::OK) {
+      _hidl_cb(ErrorCode::INVALID_ARGUMENT, chain);
+      return Void();
+    }
 
     KM_CALLV(AttestKey, hidl_vec<hidl_vec<uint8_t> >{});
 
-    vector<hidl_vec<uint8_t> > chain;
     for (int i = 0; i < response.chain().certificates_size(); i++) {
         hidl_vec<uint8_t> blob;
         blob.setToExternal(
@@ -318,11 +333,16 @@ Return<void> KeymasterDevice::upgradeKey(
 
     request.mutable_blob()->set_blob(&keyBlobToUpgrade[0],
                                      keyBlobToUpgrade.size());
-    hidl_params_to_pb(upgradeParams, request.mutable_params());
+
+    hidl_vec<uint8_t> blob;
+    if (hidl_params_to_pb(
+            upgradeParams, request.mutable_params()) != ErrorCode::OK) {
+      _hidl_cb(ErrorCode::INVALID_ARGUMENT, blob);
+      return Void();
+    }
 
     KM_CALLV(UpgradeKey, hidl_vec<uint8_t>{});
 
-    hidl_vec<uint8_t> blob;
     blob.setToExternal(
         reinterpret_cast<uint8_t*>(
             const_cast<char*>(response.blob().blob().data())),
@@ -381,11 +401,17 @@ Return<void> KeymasterDevice::begin(
 
     request.set_purpose((::nugget::app::keymaster::KeyPurpose)purpose);
     request.mutable_blob()->set_blob(&key[0], key.size());
-    hidl_params_to_pb(inParams, request.mutable_params());
+
+    hidl_vec<KeyParameter> params;
+    if (hidl_params_to_pb(
+            inParams, request.mutable_params()) != ErrorCode::OK) {
+      _hidl_cb(ErrorCode::INVALID_ARGUMENT, params,
+               response.handle().handle());
+      return Void();
+    }
 
     KM_CALLV(BeginOperation, hidl_vec<KeyParameter>{}, 0);
 
-    hidl_vec<KeyParameter> params;
     pb_to_hidl_params(response.params(), &params);
 
     _hidl_cb((ErrorCode)response.error_code(), params,
@@ -404,13 +430,19 @@ Return<void> KeymasterDevice::update(
     UpdateOperationResponse response;
 
     request.mutable_handle()->set_handle(operationHandle);
-    hidl_params_to_pb(inParams, request.mutable_params());
+
+    hidl_vec<KeyParameter> params;
+    hidl_vec<uint8_t> output;
+    if (hidl_params_to_pb(
+            inParams, request.mutable_params()) != ErrorCode::OK) {
+      _hidl_cb(ErrorCode::INVALID_ARGUMENT, 0, params, output);
+      return Void();
+    }
+
     request.set_input(&input[0], input.size());
 
     KM_CALLV(UpdateOperation, 0, hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
 
-    hidl_vec<KeyParameter> params;
-    hidl_vec<uint8_t> output;
     pb_to_hidl_params(response.params(), &params);
     output.setToExternal(
         reinterpret_cast<uint8_t*>(const_cast<char*>(response.output().data())),
@@ -432,15 +464,21 @@ Return<void> KeymasterDevice::finish(
     FinishOperationResponse response;
 
     request.mutable_handle()->set_handle(operationHandle);
-    hidl_params_to_pb(inParams, request.mutable_params());
+
+    hidl_vec<KeyParameter> params;
+    hidl_vec<uint8_t> output;
+    if (hidl_params_to_pb(
+            inParams, request.mutable_params()) != ErrorCode::OK) {
+      _hidl_cb(ErrorCode::INVALID_ARGUMENT, params, output);
+      return Void();
+    }
+
     request.set_input(&input[0], input.size());
     request.set_signature(&signature[0], signature.size());
 
     KM_CALLV(FinishOperation, hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
 
-    hidl_vec<KeyParameter> params;
     pb_to_hidl_params(response.params(), &params);
-    hidl_vec<uint8_t> output;
     output.setToExternal(
         reinterpret_cast<uint8_t*>(const_cast<char*>(response.output().data())),
         response.output().size(), false);

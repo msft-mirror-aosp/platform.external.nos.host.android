@@ -364,8 +364,8 @@ TEST(KeymasterHalTest, importKeyPKCS8Success) {
     nosapp::KeyParameter *noskp =
         response.mutable_characteristics()->
         mutable_tee_enforced()->add_params();
-    noskp->set_tag((uint32_t)Tag::ALGORITHM);
-    noskp->set_integer((uint32_t)Algorithm::RSA);
+    noskp->set_tag(nosapp::Tag::ALGORITHM);
+    noskp->set_integer((uint32_t)nosapp::Algorithm::RSA);
 
     EXPECT_CALL(
         mockService,

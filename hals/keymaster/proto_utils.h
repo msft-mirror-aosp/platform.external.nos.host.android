@@ -43,8 +43,8 @@ namespace nosapp = nugget::app::keymaster;
 
 typedef map<Tag, vector<KeyParameter>> tag_map_t;
 
-void hidl_params_to_pb(const hidl_vec<KeyParameter>& params,
-                       nosapp::KeyParameters *pbParams);
+ErrorCode hidl_params_to_pb(const hidl_vec<KeyParameter>& params,
+                            nosapp::KeyParameters *pbParams);
 ErrorCode hidl_params_to_map(const hidl_vec<KeyParameter>& params,
                              tag_map_t *tag_map);
 ErrorCode map_params_to_pb(const tag_map_t& params,
