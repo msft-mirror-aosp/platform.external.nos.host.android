@@ -112,14 +112,14 @@ static ErrorCode import_key_rsa(const tag_map_t& params,
     // Public exponent.
     request->mutable_rsa()->set_e(BN_get_word(e));
 
-    // Private exponent.
+    // Private exponent, zero-pad upto size of n.
     bssl::UniquePtr<uint8_t> d_buf(
-        reinterpret_cast<uint8_t *>(OPENSSL_malloc(BN_num_bytes(d))));
-    if (!BN_bn2le_padded(d_buf.get(), BN_num_bytes(d), d)) {
+        reinterpret_cast<uint8_t *>(OPENSSL_malloc(BN_num_bytes(n))));
+    if (!BN_bn2le_padded(d_buf.get(), BN_num_bytes(n), d)) {
         LOG(ERROR) << "ImportKey request: bn2le failed";
         return ErrorCode::UNKNOWN_ERROR;
     }
-    request->mutable_rsa()->set_d(d_buf.get(), BN_num_bytes(d));
+    request->mutable_rsa()->set_d(d_buf.get(), BN_num_bytes(n));
 
     // Modulus.
     bssl::UniquePtr<uint8_t> n_buf(
@@ -215,27 +215,28 @@ static ErrorCode import_key_ec(const tag_map_t& params,
     request->mutable_ec()->set_curve_id((uint32_t)parsed_curve_id);
 
     // Private key.
-    unique_ptr<uint8_t[]> d_buf(new uint8_t[BN_num_bytes(d)]);
-    if (!BN_bn2le_padded(d_buf.get(), BN_num_bytes(d), d)) {
+    const size_t field_size = (parsed_key_size + 7) >> 3;
+    unique_ptr<uint8_t[]> d_buf(new uint8_t[field_size]);
+    if (!BN_bn2le_padded(d_buf.get(), field_size, d)) {
         LOG(ERROR) << "ImportKey request: bn2le(d) failed";
         return ErrorCode::UNKNOWN_ERROR;
     }
-    request->mutable_ec()->set_d(d_buf.get(), BN_num_bytes(d));
+    request->mutable_ec()->set_d(d_buf.get(), field_size);
 
     // Public key.
-    unique_ptr<uint8_t[]> x_buf(new uint8_t[BN_num_bytes(x.get())]);
-    if (!BN_bn2le_padded(x_buf.get(), BN_num_bytes(x.get()), x.get())) {
+    unique_ptr<uint8_t[]> x_buf(new uint8_t[field_size]);
+    if (!BN_bn2le_padded(x_buf.get(), field_size, x.get())) {
         LOG(ERROR) << "ImportKey request: bn2le(x) failed";
         return ErrorCode::UNKNOWN_ERROR;
     }
-    request->mutable_ec()->set_x(x_buf.get(), BN_num_bytes(x.get()));
+    request->mutable_ec()->set_x(x_buf.get(), field_size);
 
-    unique_ptr<uint8_t[]> y_buf(new uint8_t[BN_num_bytes(y.get())]);
-    if (!BN_bn2le_padded(y_buf.get(), BN_num_bytes(y.get()), y.get())) {
+    unique_ptr<uint8_t[]> y_buf(new uint8_t[field_size]);
+    if (!BN_bn2le_padded(y_buf.get(), field_size, y.get())) {
         LOG(ERROR) << "ImportKey request: bn2le(y) failed";
         return ErrorCode::UNKNOWN_ERROR;
     }
-    request->mutable_ec()->set_y(y_buf.get(), BN_num_bytes(y.get()));
+    request->mutable_ec()->set_y(y_buf.get(), field_size);
 
     return ErrorCode::OK;
 }

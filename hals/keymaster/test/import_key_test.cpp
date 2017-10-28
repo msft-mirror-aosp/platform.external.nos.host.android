@@ -203,14 +203,15 @@ class ImportKeyRequestMatcher
             return false;
         }
 
-        unique_ptr<uint8_t[]> d_buf(new uint8_t[BN_num_bytes(d)]);
-        if (!BN_bn2le_padded(d_buf.get(), BN_num_bytes(d), d)) {
+        unique_ptr<uint8_t[]> d_buf(new uint8_t[BN_num_bytes(n)]);
+        if (!BN_bn2le_padded(d_buf.get(), BN_num_bytes(n), d)) {
             LOG(ERROR) << "bn2le(d) failed";
             return false;
         }
-        if (request.rsa().d().size() != BN_num_bytes(d) &&
+        // Expect d to be zero-padded to sizeof n if necessary.
+        if (request.rsa().d().size() != BN_num_bytes(n) &&
             memcmp(request.rsa().d().data(), d_buf.get(),
-                   BN_num_bytes(d)) != 0) {
+                   BN_num_bytes(n)) != 0) {
             LOG(ERROR) << "d-bytes mis-matched";
             return false;
         }
@@ -262,43 +263,45 @@ class ImportKeyRequestMatcher
         bssl::UniquePtr<BIGNUM> x(BN_new());
         bssl::UniquePtr<BIGNUM> y(BN_new());
 
-        if (!EC_POINT_get_affine_coordinates_GFp(EC_KEY_get0_group(ec_key_),
-                                                 pub_key, x.get(), y.get(), NULL)) {
+        if (!EC_POINT_get_affine_coordinates_GFp(
+                EC_KEY_get0_group(ec_key_),
+                pub_key, x.get(), y.get(), NULL)) {
             LOG(ERROR) << "failed to get public key in affine coordinates";
             return false;
         }
 
         // Private key.
-        unique_ptr<uint8_t[]> d_buf(new uint8_t[BN_num_bytes(d)]);
-        if (!BN_bn2le_padded(d_buf.get(), BN_num_bytes(d), d)) {
+        const size_t field_size = (EC_GROUP_get_degree(group) + 7) >> 3;
+        unique_ptr<uint8_t[]> d_buf(new uint8_t[field_size]);
+        if (!BN_bn2le_padded(d_buf.get(), field_size, d)) {
             LOG(ERROR) << "bn2le(d) failed";
             return false;
         }
-        if (request.ec().d().size() != BN_num_bytes(d) ||
-            memcmp(request.ec().d().data(), d_buf.get(), BN_num_bytes(d)) != 0) {
+        if (request.ec().d().size() != field_size ||
+            memcmp(request.ec().d().data(), d_buf.get(), field_size) != 0) {
             LOG(ERROR) << "d-bytes mis-matched";
             return false;
         }
 
         // Public key.
-        unique_ptr<uint8_t[]> x_buf(new uint8_t[BN_num_bytes(x.get())]);
-        if (!BN_bn2le_padded(x_buf.get(), BN_num_bytes(x.get()), x.get())) {
+        unique_ptr<uint8_t[]> x_buf(new uint8_t[field_size]);
+        if (!BN_bn2le_padded(x_buf.get(), field_size, x.get())) {
             LOG(ERROR) << "bn2le(x) failed";
             return false;
         }
-        if (request.ec().x().size() != BN_num_bytes(x.get()) ||
-            memcmp(request.ec().x().data(), x_buf.get(), BN_num_bytes(x.get())) != 0) {
+        if (request.ec().x().size() != field_size ||
+            memcmp(request.ec().x().data(), x_buf.get(), field_size) != 0) {
             LOG(ERROR) << "x-bytes mis-matched";
             return false;
         }
 
-        unique_ptr<uint8_t[]> y_buf(new uint8_t[BN_num_bytes(y.get())]);
-        if (!BN_bn2le_padded(y_buf.get(), BN_num_bytes(y.get()), y.get())) {
+        unique_ptr<uint8_t[]> y_buf(new uint8_t[field_size]);
+        if (!BN_bn2le_padded(y_buf.get(), field_size, y.get())) {
             LOG(ERROR) << "bn2le(y) failed";
             return false;
         }
-        if (request.ec().y().size() != BN_num_bytes(y.get()) ||
-            memcmp(request.ec().y().data(), y_buf.get(), BN_num_bytes(y.get())) != 0) {
+        if (request.ec().y().size() != field_size ||
+            memcmp(request.ec().y().data(), y_buf.get(), field_size) != 0) {
             LOG(ERROR) << "y-bytes mis-matched";
             return false;
         }
