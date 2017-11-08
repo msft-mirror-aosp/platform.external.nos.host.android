@@ -41,6 +41,12 @@ int verbose;
 /* Our big transfer buffer. Apps may have smaller size limits. */
 static uint8_t buf[0x4000];
 
+enum {
+	BOARD_BINDER,
+	BOARD_PROTO1,
+	BOARD_EVT,
+};
+
 /* Global options */
 static struct option_s {
 	/* program-specific options */
@@ -51,15 +57,19 @@ static struct option_s {
 	int binary;
 	int verbose;
 	int buttons;
-	int binder;
+	int board;
 	/* generic connection options */
 	const char *device;
-} option;
+} option = {
+	.board = BOARD_EVT,
+};
 
 enum no_short_opts_for_these {
 	OPT_DEVICE = 1000,
 	OPT_BUTTONS,
 	OPT_BINDER,
+	OPT_PROTO1,
+	OPT_EVT,
 };
 
 static char *short_opts = ":hi:p:m:abv";
@@ -72,7 +82,9 @@ static const struct option long_opts[] = {
 	{"binary",      0, NULL, 'b'},
 	{"verbose",     0, NULL, 'v'},
 	{"buttons",     0, NULL, OPT_BUTTONS},
-	{"binder",      0, NULL, OPT_BINDER},
+	{"binder",      0, &option.board, BOARD_BINDER},
+	{"proto1",      0, &option.board, BOARD_PROTO1},
+	{"evt",         0, &option.board, BOARD_EVT},
 	{"device",      1, NULL, OPT_DEVICE},
 	{"help",        0, NULL, 'h'},
 	{NULL, 0, NULL, 0},
@@ -86,8 +98,8 @@ static void usage(const char *progname)
 		"  Quick test to see if Citadel is responsive\n"
 		"\n"
 		"  Options:\n"
-		"        --buttons          Prompt the user to poke buttons\n"
-		"        --binder           Binder board has differences\n\n",
+		"    --buttons                        Prompt to press buttons\n"
+		"    --binder | --proto1 | --evt      Specify the board\n\n",
 		progname, progname);
 	fprintf(stderr, "Usage: %s tpm COMMAND [BYTE ...]\n"
 		"\n"
@@ -781,8 +793,8 @@ static void do_test(void)
 	printf("Get version string...\n");
 	replycount = sizeof(buf);
 	retval = nos_call_application(&dev, APP_ID_NUGGET, NUGGET_PARAM_VERSION,
-				  buf, 0,
-				  buf, &replycount);
+				      buf, 0,
+				      buf, &replycount);
 	if (retval != 0) {
 		Error("Get version failed with 0x%08x", retval);
 		debug_retval(0, retval, replycount);
@@ -815,25 +827,31 @@ static void do_test(void)
 	ap_wiggle(&dev, 7, 96);	/* Citadel GPIO 7 CTDL_AP_IRQ  is AP GPIO 96 */
 
 	/* Citadel GPIO 8 CCD_CABLE_DET is AP GPIO 126 */
-	if (option.binder)
-		// NOTE: it's on gpio 127 on the binder board */
+	if (option.board == BOARD_BINDER)
+		// but it's on gpio 127 on the binder board */
 		ap_wiggle(&dev, 8, 127);
 	else
 		ap_wiggle(&dev, 8, 126);
 
-	/* Wiggle physical buttons? */
+	/*
+	 * Citadel should be able to drive all the physical buttons under
+	 * certain circumstances, but I don't know how to confirm whether the
+	 * AP sees them change. We'll have to prompt the user to poke them to
+	 * verify the connectivity. That's probably tested elsewhere, though.
+	 */
 	if (option.buttons) {
 
-		if (option.binder)
+		if (option.board != BOARD_PROTO1)
 			/* We had to cut this trace on proto1 (b/66976641) */
 			phys_wiggle(&dev, 0, "Power");
 
 		phys_wiggle(&dev, 1, "Volume Down");
 		phys_wiggle(&dev, 2, "Volume Up");
 
-		if (option.binder)
+		if (option.board == BOARD_BINDER)
 			/* There's only a button on the binder board */
 			phys_wiggle(&dev, 10, "Forced USB Boot");
+
 	}
 
 	/*
@@ -902,9 +920,6 @@ int main(int argc, char *argv[])
 		case OPT_BUTTONS:
 			option.buttons = 1;
 			break;
-		case OPT_BINDER:
-			option.binder = 1;
-			break;
 
 			/* generic options below */
 		case OPT_DEVICE:
@@ -931,6 +946,9 @@ int main(int argc, char *argv[])
 			exit(1);
 		}
         }
+
+	if (errorcnt)
+		return !!errorcnt;
 
 	/*
 	 * We can freely intermingle options and args, so the function should
