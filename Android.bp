@@ -14,12 +14,6 @@
 // limitations under the License.
 //
 
-subdirs = [
-    "citadel",
-    "hals",
-    "manual_tests",
-]
-
 // The language related defaults
 cc_defaults {
     name: "nos_base_cc_defaults",

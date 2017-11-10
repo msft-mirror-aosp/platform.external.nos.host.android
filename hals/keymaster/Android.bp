@@ -14,11 +14,6 @@
 // limitations under the License.
 //
 
-subdirs = [
-    "citadel",
-    "test",
-]
-
 cc_library {
     name: "android.hardware.keymaster@3.0-impl.nos",
     srcs: [
