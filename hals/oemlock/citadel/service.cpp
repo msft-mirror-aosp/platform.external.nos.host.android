@@ -35,6 +35,8 @@ using ::android::hardware::oemlock::OemLock;
 using ::nos::CitadeldProxyClient;
 using ::nos::AppClient;
 
+using AvbClient = ::nugget::app::avb::Avb;
+
 int main() {
     LOG(INFO) << "OemLock HAL service starting";
 
@@ -50,7 +52,7 @@ int main() {
     configureRpcThreadpool(1, thisThreadWillJoinPool);
 
     // Start the HAL service
-    AppClient avbClient{citadeldProxy, APP_ID_AVB};
+    AvbClient avbClient{citadeldProxy};
     sp<OemLock> oemlock = new OemLock{avbClient};
     const status_t status = oemlock->registerAsService();
     if (status != OK) {

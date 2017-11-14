@@ -22,6 +22,8 @@ cc_library {
     defaults: ["nos_hal_defaults"],
     shared_libs: [
         "android.hardware.oemlock@1.0",
+        "libprotobuf-cpp-full",
+        "nos_app_avb",
     ],
     export_include_dirs: ["include"],
 }

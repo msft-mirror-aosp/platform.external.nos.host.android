@@ -14,18 +14,19 @@
 // limitations under the License.
 //
 
-cc_binary {
-    name: "android.hardware.oemlock@1.0-service.citadel",
-    init_rc: ["android.hardware.oemlock@1.0-service.citadel.rc"],
-    required: ["citadeld"],
+cc_test {
+    name: "android.hardware.oemlock@1.0-impl.nos_test",
+    generated_headers: ["nos_app_avb_service_genc++_mock"],
     srcs: [
-        "service.cpp",
+        "test.cpp",
     ],
     defaults: ["nos_hal_defaults"],
+    header_libs: ["nos_headers"],
+    static_libs: ["libgmock"],
     shared_libs: [
         "android.hardware.oemlock@1.0",
         "android.hardware.oemlock@1.0-impl.nos",
-        "libnos_citadeld_proxy",
+        "libprotobuf-cpp-full",
         "nos_app_avb",
     ],
 }

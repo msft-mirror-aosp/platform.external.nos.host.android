@@ -19,7 +19,7 @@
 
 #include <android/hardware/oemlock/1.0/IOemLock.h>
 
-#include <nos/AppClient.h>
+#include <Avb.client.h>
 
 namespace android {
 namespace hardware {
@@ -31,10 +31,12 @@ using ::android::hardware::oemlock::V1_0::OemLockStatus;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 
-using ::nos::AppClient;
+using ::nugget::app::avb::CarrierUnlock;
+
+using AvbClient = ::nugget::app::avb::IAvb;
 
 struct OemLock : public IOemLock {
-    OemLock(AppClient& avbApp) : _avbApp{avbApp} {}
+    OemLock(AvbClient& avbApp) : _avbApp{avbApp} {}
     ~OemLock() override = default;
 
     // Methods from ::android::hardware::oemlock::V1_0::IOemLock follow.
@@ -45,8 +47,11 @@ struct OemLock : public IOemLock {
     Return<OemLockStatus> setOemUnlockAllowedByDevice(bool allowed) override;
     Return<void> isOemUnlockAllowedByDevice(isOemUnlockAllowedByDevice_cb _hidl_cb) override;
 
+    static bool carrierUnlockFromSignature(const hidl_vec<uint8_t>& signature,
+                                           CarrierUnlock* unlock);
+
 private:
-    AppClient& _avbApp;
+    AvbClient& _avbApp;
 };
 
 } // namespace oemlock
