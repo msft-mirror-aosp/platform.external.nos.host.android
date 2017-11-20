@@ -17,7 +17,7 @@
 # This lets us build simple apps that talk to a Citadel dev board.
 #
 
-PROGS = test_citadel citadel_updater
+PROGS = test_citadel
 
 # Assumes a full Nugget OS source tree
 NOS_ROOT = $(realpath ../../..)

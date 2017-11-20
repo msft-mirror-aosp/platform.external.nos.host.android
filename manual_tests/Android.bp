@@ -23,19 +23,6 @@ cc_defaults {
 }
 
 cc_binary {
-    name: "citadel_updater",
-    srcs: ["citadel_updater.c"],
-    defaults: ["manual_tests_cc_defaults"],
-    static_libs: [
-        "libcrypto",
-        "libnos_datagram",
-        "libnos_datagram_citadel",
-        "libnos_transport",
-        "liblog",
-    ],
-}
-
-cc_binary {
     name: "test_citadel",
     srcs: ["test_citadel.c"],
     defaults: ["manual_tests_cc_defaults"],
