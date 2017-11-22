@@ -52,6 +52,12 @@ bool CitadeldProxyClient::IsOpen() const {
 uint32_t CitadeldProxyClient::CallApp(uint32_t appId, uint16_t arg,
                                       const std::vector<uint8_t>& request,
                                       std::vector<uint8_t>* response) {
+    // Can't pass a nullptr over binder so convert to an empty vector
+    std::vector<uint8_t> empty;
+    if (response == nullptr) {
+        response = &empty;
+    }
+
     uint32_t appStatus;
     Status status = _citadeld->callApp(appId, arg, request, response,
                                        reinterpret_cast<int32_t*>(&appStatus));
@@ -59,7 +65,7 @@ uint32_t CitadeldProxyClient::CallApp(uint32_t appId, uint16_t arg,
         return appStatus;
     }
     LOG(ERROR) << "Failed to call app via citadeld: " << status.toString8();
-    return 3; // TODO: Currently APP_ERROR_DRIVER
+    return APP_ERROR_IO;
 }
 
 } // namespace nos
