@@ -53,17 +53,19 @@ bool CitadeldProxyClient::IsOpen() const {
 
 uint32_t CitadeldProxyClient::CallApp(uint32_t appId, uint16_t arg,
                                       const std::vector<uint8_t>& request,
-                                      std::vector<uint8_t>* response) {
-    // Can't pass a nullptr over binder so convert to an empty vector
-    std::vector<uint8_t> empty;
-    if (response == nullptr) {
-        response = &empty;
-    }
+                                      std::vector<uint8_t>* _response) {
+    // Binder doesn't pass a nullptr or the capacity so resolve the response
+    // buffer size before making the call. The response vector may be the same
+    // as the request vector so the response cannot be directly resized.
+    std::vector<uint8_t> response(_response == nullptr ? 0 : _response->capacity());
 
     uint32_t appStatus;
-    Status status = _citadeld->callApp(appId, arg, request, response,
+    Status status = _citadeld->callApp(appId, arg, request, &response,
                                        reinterpret_cast<int32_t*>(&appStatus));
     if (status.isOk()) {
+        if (_response != nullptr) {
+            *_response = std::move(response);
+        }
         return appStatus;
     }
     LOG(ERROR) << "Failed to call app via citadeld: " << status.toString8();
