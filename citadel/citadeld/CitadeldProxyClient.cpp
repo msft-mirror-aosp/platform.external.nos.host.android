@@ -20,6 +20,8 @@
 #include <binder/IServiceManager.h>
 #include <binder/ProcessState.h>
 
+#include <application.h>
+
 using ::android::defaultServiceManager;
 using ::android::sp;
 using ::android::IServiceManager;

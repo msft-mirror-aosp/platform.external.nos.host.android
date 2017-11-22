@@ -52,4 +52,7 @@ cc_library {
     aidl: {
         export_aidl_headers: true,
     },
+    header_libs: [
+        "nos_headers",
+    ],
 }
