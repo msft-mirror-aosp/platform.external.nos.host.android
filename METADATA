@@ -12,7 +12,7 @@ third_party {
     type: GIT
     value: "https://nugget-os.googlesource.com/host/android/"
   }
-  version: "8972bb802de06e42d24dad8e5d6d4057e8ebe7ab"
+  version: "158c6e3e809649a3a97aa0190afeb0f84c7ad3bf"
   last_upgrade_date { year: 2017 month: 10 day: 30 }
   license_type: NOTICE
 }
