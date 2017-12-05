@@ -46,13 +46,13 @@ using ::android::hardware::hidl_vec;
 using ::android::hardware::keymaster::KeymasterDevice;
 
 // HAL
-using ::android::hardware::keymaster::V3_0::Algorithm;
+using ::android::hardware::keymaster::V4_0::Algorithm;
 using ::android::hardware::keymaster::V3_0::EcCurve;
-using ::android::hardware::keymaster::V3_0::ErrorCode;
+using ::android::hardware::keymaster::V4_0::ErrorCode;
 using ::android::hardware::keymaster::V3_0::KeyFormat;
-using ::android::hardware::keymaster::V3_0::KeyParameter;
-using ::android::hardware::keymaster::V3_0::KeyCharacteristics;
-using ::android::hardware::keymaster::V3_0::Tag;
+using ::android::hardware::keymaster::V4_0::KeyParameter;
+using ::android::hardware::keymaster::V4_0::KeyCharacteristics;
+using ::android::hardware::keymaster::V4_0::Tag;
 using android::hardware::keymaster::pb_to_hidl_params;
 
 // App
@@ -383,9 +383,9 @@ TEST(KeymasterHalTest, importKeyPKCS8Success) {
             EXPECT_EQ(error, ErrorCode::OK);
             EXPECT_THAT(blob, Eq(hidl_vec<uint8_t>{'D', 'u', 'm', 'm', 'y'}));;
 
-            EXPECT_EQ(characteristics.teeEnforced.size(), 1u);
-            EXPECT_EQ(characteristics.teeEnforced[0].tag, Tag::ALGORITHM);
-            EXPECT_EQ(characteristics.teeEnforced[0].f.algorithm,
+            EXPECT_EQ(characteristics.hardwareEnforced.size(), 1u);
+            EXPECT_EQ(characteristics.hardwareEnforced[0].tag, Tag::ALGORITHM);
+            EXPECT_EQ(characteristics.hardwareEnforced[0].f.algorithm,
                       Algorithm::RSA);
     });
 }

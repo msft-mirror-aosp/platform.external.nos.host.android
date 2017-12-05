@@ -30,10 +30,10 @@ namespace hardware {
 namespace keymaster {
 
 // HAL
-using ::android::hardware::keymaster::V3_0::Algorithm;
+using ::android::hardware::keymaster::V4_0::Algorithm;
 using ::android::hardware::keymaster::V3_0::EcCurve;
 using ::android::hardware::keymaster::V3_0::KeyFormat;
-using ::android::hardware::keymaster::V3_0::Tag;
+using ::android::hardware::keymaster::V4_0::Tag;
 using ::android::hardware::keymaster::V3_0::TagType;
 
 // App

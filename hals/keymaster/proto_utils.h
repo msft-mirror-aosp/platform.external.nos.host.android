@@ -17,7 +17,7 @@
 #ifndef ANDROID_HARDWARE_KEYMASTER_PROTO_UTILS_H
 #define ANDROID_HARDWARE_KEYMASTER_PROTO_UTILS_H
 
-#include <android/hardware/keymaster/3.0/IKeymasterDevice.h>
+#include <android/hardware/keymaster/4.0/IKeymasterDevice.h>
 
 #include <Keymaster.client.h>
 
@@ -29,9 +29,9 @@ namespace hardware {
 namespace keymaster {
 
 // HAL
-using ::android::hardware::keymaster::V3_0::ErrorCode;
-using ::android::hardware::keymaster::V3_0::KeyParameter;
-using ::android::hardware::keymaster::V3_0::Tag;
+using ::android::hardware::keymaster::V4_0::ErrorCode;
+using ::android::hardware::keymaster::V4_0::KeyParameter;
+using ::android::hardware::keymaster::V4_0::Tag;
 using ::android::hardware::hidl_vec;
 
 // std
@@ -43,6 +43,8 @@ namespace nosapp = nugget::app::keymaster;
 
 typedef map<Tag, vector<KeyParameter>> tag_map_t;
 
+ErrorCode key_parameter_to_pb(const KeyParameter& param,
+                              nosapp::KeyParameter *pb);
 ErrorCode hidl_params_to_pb(const hidl_vec<KeyParameter>& params,
                             nosapp::KeyParameters *pbParams);
 ErrorCode hidl_params_to_map(const hidl_vec<KeyParameter>& params,

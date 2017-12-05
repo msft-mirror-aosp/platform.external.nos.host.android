@@ -17,7 +17,7 @@
 #ifndef ANDROID_HARDWARE_KEYMASTER_KEYMASTER_DEVICE_H
 #define ANDROID_HARDWARE_KEYMASTER_KEYMASTER_DEVICE_H
 
-#include <android/hardware/keymaster/3.0/IKeymasterDevice.h>
+#include <android/hardware/keymaster/4.0/IKeymasterDevice.h>
 
 #include <Keymaster.client.h>
 
@@ -25,13 +25,17 @@ namespace android {
 namespace hardware {
 namespace keymaster {
 
-using ::android::hardware::keymaster::V3_0::ErrorCode;
-using ::android::hardware::keymaster::V3_0::IKeymasterDevice;
+using ::android::hardware::keymaster::V4_0::ErrorCode;
+using ::android::hardware::keymaster::V4_0::HardwareAuthToken;
+using ::android::hardware::keymaster::V4_0::HmacSharingParameters;
+using ::android::hardware::keymaster::V4_0::IKeymasterDevice;
 using ::android::hardware::keymaster::V3_0::KeyFormat;
-using ::android::hardware::keymaster::V3_0::KeyParameter;
-using ::android::hardware::keymaster::V3_0::KeyPurpose;
+using ::android::hardware::keymaster::V4_0::KeyParameter;
+using ::android::hardware::keymaster::V4_0::KeyPurpose;
+using ::android::hardware::keymaster::V4_0::VerificationToken;
 using ::android::hardware::Return;
 using ::android::hardware::hidl_vec;
+
 
 using KeymasterClient = ::nugget::app::keymaster::IKeymaster;
 
@@ -39,20 +43,37 @@ struct KeymasterDevice : public IKeymasterDevice {
     KeymasterDevice(KeymasterClient& keymaster) : _keymaster{keymaster} {}
     ~KeymasterDevice() override = default;
 
-    // Methods from ::android::hardware::keymaster::V3_0::IKeymasterDevice follow.
-    Return<void> getHardwareFeatures(getHardwareFeatures_cb _hidl_cb);
+    // Methods from ::android::hardware::keymaster::V4_0::IKeymasterDevice follow.
+    Return<void> getHardwareInfo(getHardwareInfo_cb _hidl_cb) override;
+    Return<void> getHmacSharingParameters(
+        getHmacSharingParameters_cb _hidl_cb) override;
+    Return<void> computeSharedHmac(
+        const hidl_vec<HmacSharingParameters>& params,
+        computeSharedHmac_cb _hidl_cb) override;
+    Return<void> verifyAuthorization(
+        uint64_t operationHandle,
+        const hidl_vec<KeyParameter>& parametersToVerify,
+        const HardwareAuthToken& authToken,
+        verifyAuthorization_cb _hidl_cb) override;
     Return<ErrorCode> addRngEntropy(const hidl_vec<uint8_t>& data) override;
     Return<void> generateKey(const hidl_vec<KeyParameter>& keyParams,
                              generateKey_cb _hidl_cb) override;
-    Return<void> getKeyCharacteristics(const hidl_vec<uint8_t>& keyBlob,
-                                       const hidl_vec<uint8_t>& clientId,
-                                       const hidl_vec<uint8_t>& appData,
-                                       getKeyCharacteristics_cb _hidl_cb) override;
-    Return<void> importKey(const hidl_vec<KeyParameter>& params, KeyFormat keyFormat,
-                           const hidl_vec<uint8_t>& keyData, importKey_cb _hidl_cb) override;
-    Return<void> exportKey(KeyFormat exportFormat, const hidl_vec<uint8_t>& keyBlob,
-                           const hidl_vec<uint8_t>& clientId, const hidl_vec<uint8_t>& appData,
-                           exportKey_cb _hidl_cb) override;
+    Return<void> getKeyCharacteristics(
+        const hidl_vec<uint8_t>& keyBlob,
+        const hidl_vec<uint8_t>& clientId,
+        const hidl_vec<uint8_t>& appData,
+        getKeyCharacteristics_cb _hidl_cb) override;
+    Return<void> importKey(
+        const hidl_vec<KeyParameter>& params, KeyFormat keyFormat,
+        const hidl_vec<uint8_t>& keyData, importKey_cb _hidl_cb) override;
+    Return<void> importWrappedKey(const hidl_vec<uint8_t>& wrappedKeyData,
+                                  const hidl_vec<uint8_t>& wrappingKeyBlob,
+                                  const hidl_vec<uint8_t>& maskingKey,
+                                  importWrappedKey_cb _hidl_cb) override;
+    Return<void> exportKey(
+        KeyFormat exportFormat, const hidl_vec<uint8_t>& keyBlob,
+        const hidl_vec<uint8_t>& clientId, const hidl_vec<uint8_t>& appData,
+        exportKey_cb _hidl_cb) override;
     Return<void> attestKey(const hidl_vec<uint8_t>& keyToAttest,
                            const hidl_vec<KeyParameter>& attestParams,
                            attestKey_cb _hidl_cb) override;
@@ -63,12 +84,20 @@ struct KeymasterDevice : public IKeymasterDevice {
     Return<ErrorCode> deleteAllKeys() override;
     Return<ErrorCode> destroyAttestationIds() override;
     Return<void> begin(KeyPurpose purpose, const hidl_vec<uint8_t>& key,
-                       const hidl_vec<KeyParameter>& inParams, begin_cb _hidl_cb) override;
-    Return<void> update(uint64_t operationHandle, const hidl_vec<KeyParameter>& inParams,
-                        const hidl_vec<uint8_t>& input, update_cb _hidl_cb) override;
-    Return<void> finish(uint64_t operationHandle, const hidl_vec<KeyParameter>& inParams,
-                        const hidl_vec<uint8_t>& input, const hidl_vec<uint8_t>& signature,
-                        finish_cb _hidl_cb) override;
+                       const hidl_vec<KeyParameter>& inParams,
+                       const HardwareAuthToken& authToken,
+                       begin_cb _hidl_cb) override;
+    Return<void> update(
+        uint64_t operationHandle, const hidl_vec<KeyParameter>& inParams,
+        const hidl_vec<uint8_t>& input, const HardwareAuthToken& authToken,
+        const VerificationToken& verificationToken,
+        update_cb _hidl_cb) override;
+    Return<void> finish(
+        uint64_t operationHandle, const hidl_vec<KeyParameter>& inParams,
+        const hidl_vec<uint8_t>& input, const hidl_vec<uint8_t>& signature,
+        const HardwareAuthToken& authToken,
+        const VerificationToken& verificationToken,
+        finish_cb _hidl_cb) override;
     Return<ErrorCode> abort(uint64_t operationHandle) override;
 
 private:
