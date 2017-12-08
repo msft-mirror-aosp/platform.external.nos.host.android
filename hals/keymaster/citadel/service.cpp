@@ -55,7 +55,7 @@ int main() {
     // Start the HAL service
     KeymasterClient keymasterClient{citadeldProxy};
     sp<KeymasterDevice> keymaster = new KeymasterDevice{keymasterClient};
-    const status_t status = keymaster->registerAsService();
+    const status_t status = keymaster->registerAsService("strongbox");
     if (status != OK) {
       LOG(FATAL) << "Failed to register Keymaster as a service (status: " << status << ")";
     }
