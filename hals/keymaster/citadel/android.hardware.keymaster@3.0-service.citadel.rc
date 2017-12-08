@@ -1,4 +1,4 @@
-service keymaster_hal /vendor/bin/hw/android.hardware.keymaster@3.0-service.citadel
+service vendor.keymaster-3-0-citadel /vendor/bin/hw/android.hardware.keymaster@3.0-service.citadel
     class early_hal
     user hsm
     group hsm
