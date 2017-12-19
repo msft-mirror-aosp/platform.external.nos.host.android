@@ -1,4 +1,4 @@
-service oemlock_hal /vendor/bin/hw/android.hardware.oemlock@1.0-service.citadel
+service vendor.oemlock_hal /vendor/bin/hw/android.hardware.oemlock@1.0-service.citadel
     class hal
     user hsm
     group hsm
