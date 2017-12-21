@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_KEYMASTER_IMPORT_KEY_H
-#define ANDROID_HARDWARE_KEYMASTER_IMPORT_KEY_H
+#ifndef ANDROID_HARDWARE_KEYMASTER_IMPORT_WRAPPED_KEY_H
+#define ANDROID_HARDWARE_KEYMASTER_IMPORT_WRAPPED_KEY_H
 
 #include <android/hardware/keymaster/4.0/IKeymasterDevice.h>
 
@@ -31,15 +31,17 @@ using ::android::hardware::keymaster::V3_0::KeyFormat;
 using ::android::hardware::keymaster::V4_0::KeyParameter;
 
 // Keymaster app
-using ::nugget::app::keymaster::ImportKeyRequest;
+using ::nugget::app::keymaster::ImportWrappedKeyRequest;
 
-ErrorCode import_key_request(const hidl_vec<KeyParameter>& params,
-                             KeyFormat keyFormat,
-                             const hidl_vec<uint8_t>& keyData,
-                             ImportKeyRequest *request);
+#define KM_WRAPPER_MASKING_KEY_SIZE  32
+
+ErrorCode import_wrapped_key_request(const hidl_vec<uint8_t>& wrappedKeyData,
+                                     const hidl_vec<uint8_t>& wrappingKeyBlob,
+                                     const hidl_vec<uint8_t>& maskingKey,
+                                     ImportWrappedKeyRequest *request);
 
 }  // namespace keymaster
 }  // hardware
 }  // android
 
-#endif  // ANDROID_HARDWARE_KEYMASTER_IMPORT_KEY_H
+#endif  // ANDROID_HARDWARE_KEYMASTER_IMPORT_WRAPPED_KEY_H

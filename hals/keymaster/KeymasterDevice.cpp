@@ -16,6 +16,7 @@
 
 #include "KeymasterDevice.h"
 #include "import_key.h"
+#include "import_wrapped_key.h"
 #include "proto_utils.h"
 
 #include <Keymaster.client.h>
@@ -35,15 +36,17 @@ using std::string;
 using ::android::hardware::Void;
 
 // HAL
-using ::android::hardware::keymaster::V3_0::Algorithm;
-using ::android::hardware::keymaster::V3_0::KeyCharacteristics;
+using ::android::hardware::keymaster::V4_0::Algorithm;
+using ::android::hardware::keymaster::V4_0::KeyCharacteristics;
 using ::android::hardware::keymaster::V3_0::KeyFormat;
-using ::android::hardware::keymaster::V3_0::Tag;
+using ::android::hardware::keymaster::V4_0::SecurityLevel;
+using ::android::hardware::keymaster::V4_0::Tag;
 
 // nos
 using nos::NuggetClient;
 
 // Keymaster app
+// KM 3.0 types
 using ::nugget::app::keymaster::AddRngEntropyRequest;
 using ::nugget::app::keymaster::AddRngEntropyResponse;
 using ::nugget::app::keymaster::GenerateKeyRequest;
@@ -72,6 +75,9 @@ using ::nugget::app::keymaster::FinishOperationRequest;
 using ::nugget::app::keymaster::FinishOperationResponse;
 using ::nugget::app::keymaster::AbortOperationRequest;
 using ::nugget::app::keymaster::AbortOperationResponse;
+
+// KM 4.0 types
+using ::nugget::app::keymaster::ImportWrappedKeyRequest;
 
 static ErrorCode status_to_error_code(uint32_t status)
 {
@@ -108,6 +114,7 @@ static ErrorCode status_to_error_code(uint32_t status)
     if ((ErrorCode)response.error_code() != ErrorCode::OK) {       \
         LOG(ERROR) << #meth << " : device response error code: "   \
                    << response.error_code();                       \
+        /* TODO: translate error codes. */                         \
         return (ErrorCode)response.error_code();                   \
     }                                                              \
 }
@@ -123,6 +130,7 @@ static ErrorCode status_to_error_code(uint32_t status)
     if ((ErrorCode)response.error_code() != ErrorCode::OK) {       \
         LOG(ERROR) << #meth << " : device response error code: "   \
                    << response.error_code();                       \
+        /* TODO: translate error codes. */                         \
         _hidl_cb((ErrorCode)response.error_code(), __VA_ARGS__);   \
         return Void();                                             \
     }                                                              \
@@ -130,14 +138,56 @@ static ErrorCode status_to_error_code(uint32_t status)
 
 // Methods from ::android::hardware::keymaster::V3_0::IKeymasterDevice follow.
 
-Return<void> KeymasterDevice::getHardwareFeatures(
-        getHardwareFeatures_cb _hidl_cb)
+Return<void> KeymasterDevice::getHardwareInfo(
+        getHardwareInfo_cb _hidl_cb)
 {
-    LOG(VERBOSE) << "Running KeymasterDevice::getHardwareFeatures";
+    LOG(VERBOSE) << "Running KeymasterDevice::getHardwareInfo";
 
     (void)_keymaster;
-    _hidl_cb(true, true, true, true,
-                 true, string("CitadelKeymaster"), string("Google"));
+    _hidl_cb(SecurityLevel::STRONGBOX,
+             string("CitadelKeymaster"), string("Google"));
+
+    return Void();
+}
+
+Return<void> KeymasterDevice::getHmacSharingParameters(
+    getHmacSharingParameters_cb _hidl_cb)
+{
+    LOG(VERBOSE) << "Running KeymasterDevice::getHmacSharingParameters";
+
+    (void)_keymaster;
+    _hidl_cb(ErrorCode::UNIMPLEMENTED, HmacSharingParameters());
+
+    return Void();
+}
+
+Return<void> KeymasterDevice::computeSharedHmac(
+    const hidl_vec<HmacSharingParameters>& params,
+    computeSharedHmac_cb _hidl_cb)
+{
+     LOG(VERBOSE) << "Running KeymasterDevice::computeSharedHmac";
+
+    (void)params;
+
+    (void)_keymaster;
+    _hidl_cb(ErrorCode::UNIMPLEMENTED, hidl_vec<uint8_t>{});
+
+    return Void();
+}
+
+Return<void> KeymasterDevice::verifyAuthorization(
+    uint64_t challenge, const hidl_vec<KeyParameter>& parametersToVerify,
+    const HardwareAuthToken& authToken, verifyAuthorization_cb _hidl_cb)
+{
+    LOG(VERBOSE) << "Running KeymasterDevice::verifyAuthorization";
+
+    (void)challenge;
+    (void)parametersToVerify;
+    (void)authToken;
+
+    (void)_keymaster;
+    _hidl_cb(ErrorCode::UNIMPLEMENTED, VerificationToken());
+
     return Void();
 }
 
@@ -184,7 +234,7 @@ Return<void> KeymasterDevice::generateKey(
     pb_to_hidl_params(response.characteristics().software_enforced(),
                       &characteristics.softwareEnforced);
     pb_to_hidl_params(response.characteristics().tee_enforced(),
-                      &characteristics.teeEnforced);
+                      &characteristics.hardwareEnforced);
 
     _hidl_cb((ErrorCode)response.error_code(), blob, characteristics);
     return Void();
@@ -212,7 +262,7 @@ Return<void> KeymasterDevice::getKeyCharacteristics(
     pb_to_hidl_params(response.characteristics().software_enforced(),
                       &characteristics.softwareEnforced);
     pb_to_hidl_params(response.characteristics().tee_enforced(),
-                      &characteristics.teeEnforced);
+                      &characteristics.hardwareEnforced);
 
     _hidl_cb((ErrorCode)response.error_code(), characteristics);
     return Void();
@@ -248,10 +298,12 @@ Return<void> KeymasterDevice::importKey(
     pb_to_hidl_params(response.characteristics().software_enforced(),
                       &characteristics.softwareEnforced);
     error = pb_to_hidl_params(response.characteristics().tee_enforced(),
-                              &characteristics.teeEnforced);
+                              &characteristics.hardwareEnforced);
     if (error != ErrorCode::OK) {
         LOG(ERROR) << "KeymasterDevice::importKey: response tee_enforced :"
                    << (uint32_t)error;
+        _hidl_cb(error, hidl_vec<uint8_t>{}, KeyCharacteristics{});
+        return Void();
     }
 
     _hidl_cb(ErrorCode::OK, blob, characteristics);
@@ -392,7 +444,9 @@ Return<ErrorCode> KeymasterDevice::destroyAttestationIds()
 
 Return<void> KeymasterDevice::begin(
         KeyPurpose purpose, const hidl_vec<uint8_t>& key,
-        const hidl_vec<KeyParameter>& inParams, begin_cb _hidl_cb)
+        const hidl_vec<KeyParameter>& inParams,
+        const HardwareAuthToken& authToken,
+        begin_cb _hidl_cb)
 {
     LOG(VERBOSE) << "Running KeymasterDevice::begin";
 
@@ -401,6 +455,8 @@ Return<void> KeymasterDevice::begin(
 
     request.set_purpose((::nugget::app::keymaster::KeyPurpose)purpose);
     request.mutable_blob()->set_blob(&key[0], key.size());
+    // TODO: set request.auth_token().
+    (void)authToken;
 
     hidl_vec<KeyParameter> params;
     if (hidl_params_to_pb(
@@ -422,7 +478,10 @@ Return<void> KeymasterDevice::begin(
 Return<void> KeymasterDevice::update(
         uint64_t operationHandle,
         const hidl_vec<KeyParameter>& inParams,
-        const hidl_vec<uint8_t>& input, update_cb _hidl_cb)
+        const hidl_vec<uint8_t>& input,
+        const HardwareAuthToken& authToken,
+        const VerificationToken& verificationToken,
+        update_cb _hidl_cb)
 {
     LOG(VERBOSE) << "Running KeymasterDevice::update";
 
@@ -440,6 +499,9 @@ Return<void> KeymasterDevice::update(
     }
 
     request.set_input(&input[0], input.size());
+    // TODO: add authToken and verificationToken.
+    (void)authToken;
+    (void)verificationToken;
 
     KM_CALLV(UpdateOperation, 0, hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
 
@@ -456,7 +518,10 @@ Return<void> KeymasterDevice::finish(
         uint64_t operationHandle,
         const hidl_vec<KeyParameter>& inParams,
         const hidl_vec<uint8_t>& input,
-        const hidl_vec<uint8_t>& signature, finish_cb _hidl_cb)
+        const hidl_vec<uint8_t>& signature,
+        const HardwareAuthToken& authToken,
+        const VerificationToken& verificationToken,
+        finish_cb _hidl_cb)
 {
     LOG(VERBOSE) << "Running KeymasterDevice::finish";
 
@@ -475,6 +540,10 @@ Return<void> KeymasterDevice::finish(
 
     request.set_input(&input[0], input.size());
     request.set_signature(&signature[0], signature.size());
+
+    // TODO: add authToken and verificationToken.
+    (void)authToken;
+    (void)verificationToken;
 
     KM_CALLV(FinishOperation, hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
 
@@ -499,6 +568,60 @@ Return<ErrorCode> KeymasterDevice::abort(uint64_t operationHandle)
     KM_CALL(AbortOperation);
 
     return ErrorCode::OK;
+}
+
+// Methods from ::android::hardware::keymaster::V4_0::IKeymasterDevice follow.
+Return<void> KeymasterDevice::importWrappedKey(
+    const hidl_vec<uint8_t>& wrappedKeyData,
+    const hidl_vec<uint8_t>& wrappingKeyBlob,
+    const hidl_vec<uint8_t>& maskingKey,
+    importWrappedKey_cb _hidl_cb)
+{
+    LOG(VERBOSE) << "Running KeymasterDevice::importWrappedKey";
+
+    ErrorCode error;
+    ImportWrappedKeyRequest request;
+    ImportKeyResponse response;
+
+    if (maskingKey.size() != KM_WRAPPER_MASKING_KEY_SIZE) {
+        _hidl_cb(ErrorCode::INVALID_ARGUMENT, hidl_vec<uint8_t>{},
+                 KeyCharacteristics{});
+        return Void();
+    }
+
+    error = import_wrapped_key_request(wrappedKeyData, wrappingKeyBlob,
+                                       maskingKey, &request);
+    if (error != ErrorCode::OK) {
+        LOG(ERROR) << "ImportWrappedKey request parsing failed with error "
+                   << (uint32_t)error;
+        _hidl_cb(error, hidl_vec<uint8_t>{}, KeyCharacteristics{});
+        return Void();
+    }
+
+    KM_CALLV(ImportWrappedKey, hidl_vec<uint8_t>{}, KeyCharacteristics{});
+
+    hidl_vec<uint8_t> blob;
+    blob.setToExternal(
+        reinterpret_cast<uint8_t*>(
+            const_cast<char*>(response.blob().blob().data())),
+        response.blob().blob().size(), false);
+
+    KeyCharacteristics characteristics;
+    // TODO: anything to do here with softwareEnforced?
+    pb_to_hidl_params(response.characteristics().software_enforced(),
+                      &characteristics.softwareEnforced);
+    error = pb_to_hidl_params(response.characteristics().tee_enforced(),
+                              &characteristics.hardwareEnforced);
+    if (error != ErrorCode::OK) {
+        LOG(ERROR) <<
+            "KeymasterDevice::importWrappedKey: response tee_enforced :"
+                   << (uint32_t)error;
+        _hidl_cb(error, hidl_vec<uint8_t>{}, KeyCharacteristics{});
+        return Void();
+    }
+
+    _hidl_cb(ErrorCode::OK, blob, characteristics);
+    return Void();
 }
 
 }  // namespace keymaster

@@ -28,24 +28,23 @@ using ::testing::Return;
 
 // Hardware
 using ::android::hardware::keymaster::KeymasterDevice;
+using ::android::hardware::keymaster::KeymasterDevice;
+
+// HAL
+using ::android::hardware::keymaster::V4_0::SecurityLevel;
 
 // App
 using ::nugget::app::keymaster::MockKeymaster;
 
-// GetHardwareFeatures
+// GetHardwareInfo
 
-TEST(KeymasterHalTest, getHardwareFeaturesReturnsDefaults) {
+TEST(KeymasterHalTest, getHardwareInfoReturnsDefaults) {
     MockKeymaster mockService;
     KeymasterDevice hal{mockService};
-    hal.getHardwareFeatures([&](bool isSecure, bool supportsEllipticCurve,
-                   bool supportsSymmetricCryptography,
-                   bool supportsAttestation, bool supportsAllDigests,
-                   string keymasterName, string keymasterAuthorName) {
-        EXPECT_TRUE(isSecure);
-        EXPECT_TRUE(supportsEllipticCurve);
-        EXPECT_TRUE(supportsSymmetricCryptography);
-        EXPECT_TRUE(supportsAttestation);
-        EXPECT_TRUE(supportsAllDigests);
+    hal.getHardwareInfo([&](SecurityLevel securityLevel,
+                            string keymasterName,
+                            string keymasterAuthorName) {
+        EXPECT_EQ(securityLevel, SecurityLevel::STRONGBOX);
         EXPECT_THAT(keymasterName, Eq("CitadelKeymaster"));
         EXPECT_THAT(keymasterAuthorName, Eq("Google"));
     });

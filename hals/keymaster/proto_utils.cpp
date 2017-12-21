@@ -17,24 +17,24 @@
 #include "proto_utils.h"
 
 #include <android-base/logging.h>
-#include <android/hardware/keymaster/3.0/types.h>
+#include <android/hardware/keymaster/4.0/types.h>
 
 namespace android {
 namespace hardware {
 namespace keymaster {
 
 // HAL
-using ::android::hardware::keymaster::V3_0::Algorithm;
+using ::android::hardware::keymaster::V4_0::Algorithm;
 using ::android::hardware::keymaster::V3_0::BlockMode;
 using ::android::hardware::keymaster::V3_0::Digest;
 using ::android::hardware::keymaster::V3_0::EcCurve;
 using ::android::hardware::keymaster::V3_0::HardwareAuthenticatorType;
 using ::android::hardware::keymaster::V3_0::KeyDerivationFunction;
-using ::android::hardware::keymaster::V3_0::KeyOrigin;
-using ::android::hardware::keymaster::V3_0::KeyPurpose;
+using ::android::hardware::keymaster::V4_0::KeyOrigin;
+using ::android::hardware::keymaster::V4_0::KeyPurpose;
 using ::android::hardware::keymaster::V3_0::KeyBlobUsageRequirements;
 using ::android::hardware::keymaster::V3_0::PaddingMode;
-using ::android::hardware::keymaster::V3_0::Tag;
+using ::android::hardware::keymaster::V4_0::Tag;
 using ::android::hardware::keymaster::V3_0::TagType;
 
 static TagType type_from_tag(Tag tag)
@@ -76,8 +76,6 @@ static nosapp::KeyPurpose translate_purpose(KeyPurpose purpose)
         return nosapp::KeyPurpose::SIGN;
     case KeyPurpose::VERIFY:
         return nosapp::KeyPurpose::VERIFY;
-    case KeyPurpose::DERIVE_KEY:
-        return nosapp::KeyPurpose::DERIVE_KEY;
     case KeyPurpose::WRAP_KEY:
         return nosapp::KeyPurpose::WRAP_KEY;
     default:
@@ -100,9 +98,6 @@ static ErrorCode translate_purpose(nosapp::KeyPurpose purpose, KeyPurpose *out)
     case nosapp::KeyPurpose::VERIFY:
         *out = KeyPurpose::VERIFY;
         break;
-    case nosapp::KeyPurpose::DERIVE_KEY:
-        *out = KeyPurpose::DERIVE_KEY;
-        break;
     case nosapp::KeyPurpose::WRAP_KEY:
         *out = KeyPurpose::WRAP_KEY;
         break;
@@ -122,10 +117,8 @@ static nosapp::Algorithm translate_algorithm(Algorithm algorithm)
         return nosapp::Algorithm::EC;
     case Algorithm::AES:
         return nosapp::Algorithm::AES;
-#if 0  // TODO: wait for HAL update.
     case Algorithm::DES:
         return nosapp::Algorithm::DES;
-#endif
     case Algorithm::HMAC:
         return nosapp::Algorithm::HMAC;
     default:
@@ -146,11 +139,9 @@ static ErrorCode translate_algorithm(nosapp::Algorithm algorithm,
     case nosapp::Algorithm::AES:
         *out = Algorithm::AES;
         break;
-#if 0  // TODO: wait for HAL update.
     case nosapp::Algorithm::DES:
         *out = Algorithm::DES;
         break;
-#endif
     case nosapp::Algorithm::HMAC:
         *out = Algorithm::HMAC;
         break;
@@ -296,56 +287,6 @@ static ErrorCode translate_padding_mode(nosapp::PaddingMode padding_mode,
         break;
     case nosapp::PaddingMode::PADDING_PKCS7:
         *out = PaddingMode::PKCS7;
-        break;
-    default:
-        return ErrorCode::UNKNOWN_ERROR;
-    }
-
-    return ErrorCode::OK;
-}
-
-static nosapp::KeyDerivationFunction translate_key_derivation_function(
-    KeyDerivationFunction kdf)
-{
-    switch (kdf) {
-    case KeyDerivationFunction::NONE:
-        return nosapp::KeyDerivationFunction::KDF_NONE;
-    case KeyDerivationFunction::RFC5869_SHA256:
-        return nosapp::KeyDerivationFunction::KDF_RFC5869_SHA256;
-    case KeyDerivationFunction::ISO18033_2_KDF1_SHA1:
-        return nosapp::KeyDerivationFunction::KDF_ISO18033_2_KDF1_SHA1;
-    case KeyDerivationFunction::ISO18033_2_KDF1_SHA256:
-        return nosapp::KeyDerivationFunction::KDF_ISO18033_2_KDF1_SHA256;
-    case KeyDerivationFunction::ISO18033_2_KDF2_SHA1:
-        return nosapp::KeyDerivationFunction::KDF_ISO18033_2_KDF2_SHA1;
-    case KeyDerivationFunction::ISO18033_2_KDF2_SHA256:
-        return nosapp::KeyDerivationFunction::KDF_ISO18033_2_KDF2_SHA256;
-    default:
-        return nosapp::KeyDerivationFunction::KDF_MAX;
-    }
-}
-
-static ErrorCode translate_key_derivation_function(
-    nosapp::KeyDerivationFunction kdf, KeyDerivationFunction *out)
-{
-    switch (kdf) {
-    case nosapp::KeyDerivationFunction::KDF_NONE:
-        *out = KeyDerivationFunction::NONE;
-        break;
-    case nosapp::KeyDerivationFunction::KDF_RFC5869_SHA256:
-        *out = KeyDerivationFunction::RFC5869_SHA256;
-        break;
-    case nosapp::KeyDerivationFunction::KDF_ISO18033_2_KDF1_SHA1:
-        *out = KeyDerivationFunction::ISO18033_2_KDF1_SHA1;
-        break;
-    case nosapp::KeyDerivationFunction::KDF_ISO18033_2_KDF1_SHA256:
-        *out = KeyDerivationFunction::ISO18033_2_KDF1_SHA256;
-        break;
-    case nosapp::KeyDerivationFunction::KDF_ISO18033_2_KDF2_SHA1:
-        *out = KeyDerivationFunction::ISO18033_2_KDF2_SHA1;
-        break;
-    case nosapp::KeyDerivationFunction::KDF_ISO18033_2_KDF2_SHA256:
-        *out = KeyDerivationFunction::ISO18033_2_KDF2_SHA256;
         break;
     default:
         return ErrorCode::UNKNOWN_ERROR;
@@ -503,8 +444,8 @@ static ErrorCode translate_key_origin(nosapp::KeyOrigin key_origin,
     return ErrorCode::OK;
 }
 
-static ErrorCode key_parameter_to_pb(const KeyParameter& param,
-                                     nosapp::KeyParameter *pb)
+ErrorCode key_parameter_to_pb(const KeyParameter& param,
+                              nosapp::KeyParameter *pb)
 {
     switch (param.tag) {
     case Tag::INVALID:
@@ -536,17 +477,12 @@ static ErrorCode key_parameter_to_pb(const KeyParameter& param,
     case Tag::MIN_MAC_LENGTH: // (TagType:UINT | 8)
         pb->set_integer(param.f.integer);
         break;
-    case Tag::KDF: // (TagType:ENUM_REP | 9)
-        pb->set_integer((uint32_t)translate_key_derivation_function(
-            param.f.keyDerivationFunction));
-        break;
     case Tag::EC_CURVE: // (TagType:ENUM | 10)
         pb->set_integer((uint32_t)translate_ec_curve(param.f.ecCurve));
         break;
     case Tag::RSA_PUBLIC_EXPONENT: // (TagType:ULONG | 200)
         pb->set_integer(param.f.integer);
         break;
-    case Tag::ECIES_SINGLE_HASH_MODE: // (TagType:BOOL | 201)
     case Tag::INCLUDE_UNIQUE_ID: // (TagType:BOOL | 202)
         pb->set_integer(param.f.boolValue);
         break;
@@ -557,6 +493,11 @@ static ErrorCode key_parameter_to_pb(const KeyParameter& param,
     case Tag::BOOTLOADER_ONLY: // (TagType:BOOL | 302)
         pb->set_integer(param.f.boolValue);
         break;
+    case Tag::ROLLBACK_RESISTANCE: // (TagType:BOOL | 303)
+        pb->set_integer(param.f.boolValue);
+        break;
+    case Tag::HARDWARE_TYPE: // (TagType:ENUM | 304)
+        break;
     case Tag::ACTIVE_DATETIME: // (TagType:DATE | 400)
         pb->set_long_integer(param.f.dateTime);
         break;
@@ -566,12 +507,6 @@ static ErrorCode key_parameter_to_pb(const KeyParameter& param,
         break;
     case Tag::MIN_SECONDS_BETWEEN_OPS: // (TagType:UINT | 403)
     case Tag::MAX_USES_PER_BOOT: // (TagType:UINT | 404)
-        pb->set_integer(param.f.integer);
-        break;
-    case Tag::ALL_USERS: // (TagType:BOOL | 500)
-        pb->set_integer(param.f.boolValue);
-        break;
-    case Tag::USER_ID: // (TagType:UINT | 501)
         pb->set_integer(param.f.integer);
         break;
     case Tag::USER_SECURE_ID: // (TagType:ULONG_REP | 502)
@@ -588,14 +523,10 @@ static ErrorCode key_parameter_to_pb(const KeyParameter& param,
         pb->set_integer(param.f.integer);
         break;
     case Tag::ALLOW_WHILE_ON_BODY: // (TagType:BOOL | 506)
-    case Tag::ALL_APPLICATIONS: // (TagType:BOOL | 600)
         pb->set_integer(param.f.boolValue);
         break;
     case Tag::APPLICATION_ID: // (TagType:BYTES | 601)
         pb->set_blob(&param.blob[0], param.blob.size());
-        break;
-    case Tag::EXPORTABLE: // (TagType:BOOL | 602)
-        pb->set_integer(param.f.boolValue);
         break;
     case Tag::APPLICATION_DATA: // (TagType:BYTES | 700)
         pb->set_blob(&param.blob[0], param.blob.size());
@@ -605,9 +536,6 @@ static ErrorCode key_parameter_to_pb(const KeyParameter& param,
         break;
     case Tag::ORIGIN: // (TagType:ENUM | 702)
         pb->set_integer((uint32_t)translate_key_origin(param.f.origin));
-        break;
-    case Tag::ROLLBACK_RESISTANT: // (TagType:BOOL | 703)
-        pb->set_integer(param.f.boolValue);
         break;
     case Tag::ROOT_OF_TRUST: // (TagType:BYTES | 704)
         pb->set_blob(&param.blob[0], param.blob.size());
@@ -629,7 +557,6 @@ static ErrorCode key_parameter_to_pb(const KeyParameter& param,
     case Tag::ATTESTATION_ID_MODEL: // (TagType:BYTES | 717)
     case Tag::ASSOCIATED_DATA: // (TagType:BYTES | 1000)
     case Tag::NONCE: // (TagType:BYTES | 1001)
-    case Tag::AUTH_TOKEN: // (TagType:BYTES | 1002)
         pb->set_blob(&param.blob[0], param.blob.size());
         break;
     case Tag::MAC_LENGTH: // (TagType:UINT | 1003)
@@ -695,13 +622,6 @@ ErrorCode pb_to_key_parameter(const nosapp::KeyParameter& param,
     case nosapp::Tag::MIN_MAC_LENGTH: // (TagType:UINT | 8)
         kp->f.integer = param.integer();
         break;
-    case nosapp::Tag::KDF: // (TagType:ENUM_REP | 9)
-        if (translate_key_derivation_function(
-                static_cast<nosapp::KeyDerivationFunction>(param.integer()),
-                &kp->f.keyDerivationFunction) != ErrorCode::OK) {
-            return ErrorCode::UNKNOWN_ERROR;
-        }
-        break;
     case nosapp::Tag::EC_CURVE: // (TagType:ENUM | 10)
         if (translate_ec_curve(
                 static_cast<nosapp::EcCurve>(param.integer()),
@@ -712,7 +632,6 @@ ErrorCode pb_to_key_parameter(const nosapp::KeyParameter& param,
     case nosapp::Tag::RSA_PUBLIC_EXPONENT: // (TagType:ULONG | 200)
         kp->f.integer = param.integer();
         break;
-    case nosapp::Tag::ECIES_SINGLE_HASH_MODE: // (TagType:BOOL | 201)
     case nosapp::Tag::INCLUDE_UNIQUE_ID: // (TagType:BOOL | 202)
         kp->f.boolValue = (bool)param.integer();
         break;
@@ -724,6 +643,7 @@ ErrorCode pb_to_key_parameter(const nosapp::KeyParameter& param,
         }
         break;
     case nosapp::Tag::BOOTLOADER_ONLY: // (TagType:BOOL | 302)
+    case nosapp::Tag::ROLLBACK_RESISTANCE: // (TagType:BOOL | 303)
         kp->f.boolValue = (bool)param.integer();
         break;
     case nosapp::Tag::ACTIVE_DATETIME: // (TagType:DATE | 400)
@@ -733,12 +653,6 @@ ErrorCode pb_to_key_parameter(const nosapp::KeyParameter& param,
         break;
     case nosapp::Tag::MIN_SECONDS_BETWEEN_OPS: // (TagType:UINT | 403)
     case nosapp::Tag::MAX_USES_PER_BOOT: // (TagType:UINT | 404)
-        kp->f.integer = param.integer();
-        break;
-    case nosapp::Tag::ALL_USERS: // (TagType:BOOL | 500)
-        kp->f.boolValue = (bool)param.integer();
-        break;
-    case nosapp::Tag::USER_ID: // (TagType:UINT | 501)
         kp->f.integer = param.integer();
         break;
     case nosapp::Tag::USER_SECURE_ID: // (TagType:ULONG_REP | 502)
@@ -758,16 +672,12 @@ ErrorCode pb_to_key_parameter(const nosapp::KeyParameter& param,
         kp->f.integer = param.integer();
         break;
     case nosapp::Tag::ALLOW_WHILE_ON_BODY: // (TagType:BOOL | 506)
-    case nosapp::Tag::ALL_APPLICATIONS: // (TagType:BOOL | 600)
         kp->f.boolValue = (bool)param.integer();
         break;
     case nosapp::Tag::APPLICATION_ID: // (TagType:BYTES | 601)
         kp->blob.setToExternal(
             reinterpret_cast<uint8_t *>(
                 const_cast<char *>(param.blob().data())), param.blob().size());;
-        break;
-    case nosapp::Tag::EXPORTABLE: // (TagType:BOOL | 602)
-        kp->f.boolValue = (bool)param.integer();
         break;
     case nosapp::Tag::APPLICATION_DATA: // (TagType:BYTES | 700)
         kp->blob.setToExternal(
@@ -783,9 +693,6 @@ ErrorCode pb_to_key_parameter(const nosapp::KeyParameter& param,
                 &kp->f.origin) != ErrorCode::OK) {
             return ErrorCode::UNKNOWN_ERROR;
         }
-        break;
-    case nosapp::Tag::ROLLBACK_RESISTANT: // (TagType:BOOL | 703)
-        kp->f.boolValue = (bool)param.integer();
         break;
     case nosapp::Tag::ROOT_OF_TRUST: // (TagType:BYTES | 704)
         kp->blob.setToExternal(
@@ -809,7 +716,6 @@ ErrorCode pb_to_key_parameter(const nosapp::KeyParameter& param,
     case nosapp::Tag::ATTESTATION_ID_MODEL: // (TagType:BYTES | 717)
     case nosapp::Tag::ASSOCIATED_DATA: // (TagType:BYTES | 1000)
     case nosapp::Tag::NONCE: // (TagType:BYTES | 1001)
-    case nosapp::Tag::AUTH_TOKEN: // (TagType:BYTES | 1002)
         kp->blob.setToExternal(
             reinterpret_cast<uint8_t *>(
                 const_cast<char *>(param.blob().data())), param.blob().size());

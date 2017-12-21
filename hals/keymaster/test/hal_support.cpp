@@ -16,8 +16,8 @@
 
 #include <hal_support.h>
 
-using ::android::hardware::keymaster::V3_0::KeyParameter;
-using ::android::hardware::keymaster::V3_0::Tag;
+using ::android::hardware::keymaster::V4_0::KeyParameter;
+using ::android::hardware::keymaster::V4_0::Tag;
 
 bool operator==(const KeyParameter& a, const KeyParameter& b) {
     if (a.tag != b.tag) {
@@ -30,13 +30,10 @@ bool operator==(const KeyParameter& a, const KeyParameter& b) {
     case Tag::INVALID:
     case Tag::CALLER_NONCE:
     case Tag::INCLUDE_UNIQUE_ID:
-    case Tag::ECIES_SINGLE_HASH_MODE:
     case Tag::BOOTLOADER_ONLY:
+    case Tag::ROLLBACK_RESISTANCE:
     case Tag::NO_AUTH_REQUIRED:
     case Tag::ALLOW_WHILE_ON_BODY:
-    case Tag::EXPORTABLE:
-    case Tag::ALL_APPLICATIONS:
-    case Tag::ROLLBACK_RESISTANT:
     case Tag::RESET_SINCE_ID_ROTATION:
         return true;
 
@@ -45,8 +42,6 @@ bool operator==(const KeyParameter& a, const KeyParameter& b) {
     case Tag::MIN_MAC_LENGTH:
     case Tag::MIN_SECONDS_BETWEEN_OPS:
     case Tag::MAX_USES_PER_BOOT:
-    case Tag::ALL_USERS:
-    case Tag::USER_ID:
     case Tag::OS_VERSION:
     case Tag::OS_PATCHLEVEL:
     case Tag::MAC_LENGTH:
@@ -82,7 +77,6 @@ bool operator==(const KeyParameter& a, const KeyParameter& b) {
     case Tag::ATTESTATION_ID_MODEL:
     case Tag::ASSOCIATED_DATA:
     case Tag::NONCE:
-    case Tag::AUTH_TOKEN:
         return a.blob == b.blob;
 
     /* Enum tags */
@@ -106,7 +100,7 @@ bool operator==(const KeyParameter& a, const KeyParameter& b) {
         return a.f.origin == b.f.origin;
 
     /* Unsupported tags */
-    case Tag::KDF:
+    case Tag::HARDWARE_TYPE:
         return false;
     }
 }
