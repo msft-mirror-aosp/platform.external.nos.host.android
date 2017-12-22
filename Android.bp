@@ -16,7 +16,7 @@
 
 // The language related defaults
 cc_defaults {
-    name: "nos_base_cc_defaults",
+    name: "nos_lang_cc_defaults",
     clang: true,
     cflags: [
         "-pedantic",
@@ -31,9 +31,8 @@ cc_defaults {
 
 // Language and vendor related defaults
 cc_defaults {
-    name: "nos_cc_defaults",
-    defaults: ["nos_base_cc_defaults"],
-    relative_install_path: "hw",
+    name: "nos_base_cc_defaults",
+    defaults: ["nos_lang_cc_defaults"],
     vendor: true,
     owner: "google",
 }
@@ -41,6 +40,13 @@ cc_defaults {
 // Defaults for components shared between the host and device
 cc_defaults {
     name: "nos_shared_cc_defaults",
-    defaults: ["nos_cc_defaults"],
+    defaults: ["nos_base_cc_defaults"],
     host_supported: true,
+}
+
+// Defaults for device executables
+cc_defaults {
+    name: "nos_cc_defaults",
+    defaults: ["nos_base_cc_defaults"],
+    relative_install_path: "hw",
 }

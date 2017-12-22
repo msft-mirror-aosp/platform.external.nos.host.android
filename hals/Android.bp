@@ -17,7 +17,7 @@
 // Defaults for the libnos HAL binaries
 cc_defaults {
     name: "nos_hal_defaults",
-    defaults: ["nos_cc_defaults"],
+    defaults: ["nos_base_cc_defaults"],
     header_libs: [
         "nos_headers",
     ],

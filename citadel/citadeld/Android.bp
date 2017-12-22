@@ -15,16 +15,32 @@
 //
 
 cc_defaults {
-    name: "citadeld_defaults",
+    name: "citadeld_base_defaults",
     srcs: [
         "aidl/android/hardware/citadel/ICitadeld.aidl",
     ],
-    defaults: ["nos_cc_defaults"],
+    defaults: ["nos_base_cc_defaults"],
     shared_libs: [
         "libbase",
         "libbinder",
         "libnos",
         "libutils",
+    ],
+}
+
+cc_defaults {
+    name: "citadeld_defaults",
+    defaults: [
+        "citadeld_base_defaults",
+        "nos_cc_defaults",
+    ],
+}
+
+cc_defaults {
+    name: "citadeld_shared_defaults",
+    defaults: [
+        "citadeld_base_defaults",
+        "nos_base_cc_defaults",
     ],
 }
 
@@ -46,7 +62,7 @@ cc_library {
     srcs: [
         "CitadeldProxyClient.cpp",
     ],
-    defaults: ["citadeld_defaults"],
+    defaults: ["citadeld_shared_defaults"],
     export_include_dirs: ["include"],
     export_shared_lib_headers: ["libbinder"],
     aidl: {
