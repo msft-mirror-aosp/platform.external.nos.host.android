@@ -24,7 +24,7 @@ namespace hardware {
 namespace keymaster {
 
 // HAL
-using ::android::hardware::keymaster::V4_0::Algorithm;
+using ::android::hardware::keymaster::V3_0::Algorithm;
 using ::android::hardware::keymaster::V3_0::BlockMode;
 using ::android::hardware::keymaster::V3_0::Digest;
 using ::android::hardware::keymaster::V3_0::EcCurve;
@@ -117,8 +117,11 @@ static nosapp::Algorithm translate_algorithm(Algorithm algorithm)
         return nosapp::Algorithm::EC;
     case Algorithm::AES:
         return nosapp::Algorithm::AES;
+#if 0
+    /* TODO: add support for DES. */
     case Algorithm::DES:
         return nosapp::Algorithm::DES;
+#endif
     case Algorithm::HMAC:
         return nosapp::Algorithm::HMAC;
     default:
@@ -139,9 +142,12 @@ static ErrorCode translate_algorithm(nosapp::Algorithm algorithm,
     case nosapp::Algorithm::AES:
         *out = Algorithm::AES;
         break;
+#if 0
+    /* TODO: add support for DES. */
     case nosapp::Algorithm::DES:
         *out = Algorithm::DES;
         break;
+#endif
     case nosapp::Algorithm::HMAC:
         *out = Algorithm::HMAC;
         break;

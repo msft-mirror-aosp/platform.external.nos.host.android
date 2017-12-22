@@ -32,7 +32,7 @@ namespace hardware {
 namespace keymaster {
 
 // HAL
-using ::android::hardware::keymaster::V4_0::Algorithm;
+using ::android::hardware::keymaster::V3_0::Algorithm;
 using ::android::hardware::keymaster::V3_0::BlockMode;
 using ::android::hardware::keymaster::V3_0::Digest;
 using ::android::hardware::keymaster::V3_0::EcCurve;

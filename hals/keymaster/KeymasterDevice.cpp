@@ -36,7 +36,7 @@ using std::string;
 using ::android::hardware::Void;
 
 // HAL
-using ::android::hardware::keymaster::V4_0::Algorithm;
+using ::android::hardware::keymaster::V3_0::Algorithm;
 using ::android::hardware::keymaster::V4_0::KeyCharacteristics;
 using ::android::hardware::keymaster::V3_0::KeyFormat;
 using ::android::hardware::keymaster::V4_0::SecurityLevel;
