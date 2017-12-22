@@ -623,15 +623,16 @@ static int set_ap_value(uint32_t num, int val)
 	return 1;
 }
 
-static void ap_wiggle(const struct nos_device *dev, uint32_t cit_gpio,
-		      uint32_t ap_gpio)
+static void ap_wiggle(const struct nos_device *dev, const char *name,
+		      uint32_t cit_gpio, uint32_t ap_gpio)
 {
 	uint32_t prev, curr;
 	uint32_t cit_bit;
 
 	cit_bit = (1 << cit_gpio);
 
-	printf("Test GPIO AP %d => Citadel %d\n", ap_gpio, cit_gpio);
+	printf("Test %s  AP gpio %d => Citadel gpio %d\n",
+	       name, ap_gpio, cit_gpio);
 
 	/* Configure AP for output */
 	if (!is_ap_exported(ap_gpio))
@@ -663,11 +664,10 @@ static void ap_wiggle(const struct nos_device *dev, uint32_t cit_gpio,
 	}
 	debug(1, "citadel 0x%08x\n", curr);
 	if (!(curr & cit_bit))
-		Error("%s: expected cit_gpio %d high, was low", __func__,
-		      cit_gpio);
+		Error("expected cit_gpio %d high, was low", cit_gpio);
 	if (prev != curr && (prev ^ curr) != cit_bit)
-		Error("%s: unexpected GPIO change: prev 0x%08x cur 0x%08x",
-		      __func__, prev, curr);
+		Error("unexpected GPIO change: prev 0x%08x cur 0x%08x",
+		      prev, curr);
 	prev = curr;
 
 	/* Drive Low, confirm low again, no other bits changed */
@@ -679,11 +679,10 @@ static void ap_wiggle(const struct nos_device *dev, uint32_t cit_gpio,
 	}
 	debug(1, "citadel 0x%08x\n", curr);
 	if (curr & cit_bit)
-		Error("%s: expected cit_gpio %d low, was high", __func__,
-		      cit_gpio);
+		Error("expected cit_gpio %d low, was high", cit_gpio);
 	if (prev != curr && (prev ^ curr) != cit_bit)
-		Error("%s: unexpected GPIO change: prev 0x%08x cur 0x%08x",
-		      __func__, prev, curr);
+		Error("unexpected GPIO change: prev 0x%08x cur 0x%08x",
+		      prev, curr);
 }
 
 static int stopped;
@@ -821,17 +820,35 @@ static void do_test(void)
 	if (value != 0x00000000)
 		Error("GPIO direction = 0x%08x\n", value);
 
-	ap_wiggle(&dev, 4, 76);	/* Citadel GPIO 4 AP_SEC_STATE is AP GPIO 76 */
-	ap_wiggle(&dev, 5, 69);	/* Citadel GPIO 5 AP_PWR_STATE is AP GPIO 69 */
-	ap_wiggle(&dev, 6, 94);	/* Citadel GPIO 6 AP_CTDL_IRQ  is AP GPIO 94 */
-	ap_wiggle(&dev, 7, 96);	/* Citadel GPIO 7 CTDL_AP_IRQ  is AP GPIO 96 */
+	/*
+	 * The MSM GPIOs have moved all around with each revision.
+	 *
+	 *   Net Name           Citadel  Pin         BINDER  PROTO1  EVT
+	 *
+	 *   CTDL_AP_IRQ        DIOA5    7           96      96      129
+	 *   AP_CTDL_IRQ        DIOA11   6           94      94      135
+	 *   AP_SEC_STATE       DIOB7    4           76      76      76
+	 *   AP_PWR_STATE       DIOB8    5           69      69      69
+	 *   CCD_CABLE_DET      DIOA6    8           127     126     126
+	 */
 
-	/* Citadel GPIO 8 CCD_CABLE_DET is AP GPIO 126 */
-	if (option.board == BOARD_BINDER)
-		// but it's on gpio 127 on the binder board */
-		ap_wiggle(&dev, 8, 127);
+	if (option.board == BOARD_EVT)
+		ap_wiggle(&dev, "CTDL_AP_IRQ", 7, 129);
 	else
-		ap_wiggle(&dev, 8, 126);
+		ap_wiggle(&dev, "CTDL_AP_IRQ", 7, 96);
+
+	if (option.board == BOARD_EVT)
+		ap_wiggle(&dev, "AP_CTDL_IRQ", 6, 135);
+	else
+		ap_wiggle(&dev, "AP_CTDL_IRQ", 6, 94);
+
+	ap_wiggle(&dev, "AP_SEC_STATE", 4, 76);
+	ap_wiggle(&dev, "AP_PWR_STATE", 5, 69);
+
+	if (option.board == BOARD_BINDER)
+		ap_wiggle(&dev, "CCD_CABLE_DET", 8, 127);
+	else
+		ap_wiggle(&dev, "CCD_CABLE_DET", 8, 126);
 
 	/*
 	 * Citadel should be able to drive all the physical buttons under
