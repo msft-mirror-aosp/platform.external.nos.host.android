@@ -53,6 +53,7 @@ ErrorCode map_params_to_pb(const tag_map_t& params,
                            nosapp::KeyParameters *pbParams);
 ErrorCode pb_to_hidl_params(const nosapp::KeyParameters& pbParams,
                             hidl_vec<KeyParameter> *params);
+ErrorCode translate_error_code(nosapp::ErrorCode error_code);
 
 }  // namespace keymaster
 }  // hardware
