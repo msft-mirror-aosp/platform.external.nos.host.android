@@ -18,6 +18,7 @@
 
 #include <android-base/logging.h>
 #include <android/hardware/keymaster/4.0/types.h>
+#include <keymasterV4_0/key_param_output.h>
 
 namespace android {
 namespace hardware {
@@ -487,7 +488,7 @@ ErrorCode key_parameter_to_pb(const KeyParameter& param,
         pb->set_integer((uint32_t)translate_ec_curve(param.f.ecCurve));
         break;
     case Tag::RSA_PUBLIC_EXPONENT: // (TagType:ULONG | 200)
-        pb->set_integer(param.f.integer);
+        pb->set_long_integer(param.f.longInteger);
         break;
     case Tag::INCLUDE_UNIQUE_ID: // (TagType:BOOL | 202)
         pb->set_integer(param.f.boolValue);
@@ -571,6 +572,9 @@ ErrorCode key_parameter_to_pb(const KeyParameter& param,
     case Tag::RESET_SINCE_ID_ROTATION: // (TagType:BOOL | 1004)
         pb->set_integer(param.f.boolValue);
         break;
+    default:
+        LOG(ERROR) << "Unhandled tag value in key_parameter_to_pb: "
+                   << (uint32_t) param.tag;
     }
 
     pb->set_tag(translate_tag(param.tag));
@@ -636,7 +640,7 @@ ErrorCode pb_to_key_parameter(const nosapp::KeyParameter& param,
         }
         break;
     case nosapp::Tag::RSA_PUBLIC_EXPONENT: // (TagType:ULONG | 200)
-        kp->f.integer = param.integer();
+        kp->f.longInteger = param.long_integer();
         break;
     case nosapp::Tag::INCLUDE_UNIQUE_ID: // (TagType:BOOL | 202)
         kp->f.boolValue = (bool)param.integer();
@@ -783,7 +787,6 @@ ErrorCode hidl_params_to_map(const hidl_vec<KeyParameter>& params,
                     std::pair<Tag, vector<KeyParameter> >(
                         params[i].tag, v));
             } else {
-                LOG(ERROR) << "params_to_map: never reached";
                 (*tag_map)[params[i].tag].push_back(params[i]);
             }
             break;
@@ -830,7 +833,6 @@ ErrorCode pb_to_hidl_params(const nosapp::KeyParameters& pbParams,
     }
 
     *params = kpv;
-
     return ErrorCode::OK;
 }
 
