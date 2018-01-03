@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-// Defaults for the libnos HAL binaries
+// Defaults for the libnos HAL libraries
 cc_defaults {
     name: "nos_hal_defaults",
     defaults: ["nos_base_cc_defaults"],
