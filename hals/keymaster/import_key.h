@@ -27,7 +27,7 @@ namespace keymaster {
 
 // HAL
 using ::android::hardware::keymaster::V4_0::ErrorCode;
-using ::android::hardware::keymaster::V3_0::KeyFormat;
+using ::android::hardware::keymaster::V4_0::KeyFormat;
 using ::android::hardware::keymaster::V4_0::KeyParameter;
 
 // Keymaster app

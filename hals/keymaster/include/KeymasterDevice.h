@@ -29,7 +29,7 @@ using ::android::hardware::keymaster::V4_0::ErrorCode;
 using ::android::hardware::keymaster::V4_0::HardwareAuthToken;
 using ::android::hardware::keymaster::V4_0::HmacSharingParameters;
 using ::android::hardware::keymaster::V4_0::IKeymasterDevice;
-using ::android::hardware::keymaster::V3_0::KeyFormat;
+using ::android::hardware::keymaster::V4_0::KeyFormat;
 using ::android::hardware::keymaster::V4_0::KeyParameter;
 using ::android::hardware::keymaster::V4_0::KeyPurpose;
 using ::android::hardware::keymaster::V4_0::VerificationToken;
