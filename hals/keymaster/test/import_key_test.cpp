@@ -46,10 +46,10 @@ using ::android::hardware::hidl_vec;
 using ::android::hardware::keymaster::KeymasterDevice;
 
 // HAL
-using ::android::hardware::keymaster::V3_0::Algorithm;
-using ::android::hardware::keymaster::V3_0::EcCurve;
+using ::android::hardware::keymaster::V4_0::Algorithm;
+using ::android::hardware::keymaster::V4_0::EcCurve;
 using ::android::hardware::keymaster::V4_0::ErrorCode;
-using ::android::hardware::keymaster::V3_0::KeyFormat;
+using ::android::hardware::keymaster::V4_0::KeyFormat;
 using ::android::hardware::keymaster::V4_0::KeyParameter;
 using ::android::hardware::keymaster::V4_0::KeyCharacteristics;
 using ::android::hardware::keymaster::V4_0::Tag;
