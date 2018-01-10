@@ -90,7 +90,8 @@ static ErrorCode import_key_rsa(const tag_map_t& params,
     size_t parsedKeySize = RSA_size(rsa) * 8;
     if (keySize != nullptr && parsedKeySize != *keySize) {
         // If specified, key size must match the PKCS8 blob.
-        return ErrorCode::INVALID_ARGUMENT;
+        LOG(ERROR) << "ImportKey request: key size parameter mis-match";
+        return ErrorCode::IMPORT_PARAMETER_MISMATCH;
     }
 
     const BIGNUM *n;
@@ -103,7 +104,7 @@ static ErrorCode import_key_rsa(const tag_map_t& params,
                    << *publicExponent
                    << " expected: "
                    << BN_get_word(e);
-        return ErrorCode::INVALID_ARGUMENT;
+        return ErrorCode::IMPORT_PARAMETER_MISMATCH;
     }
 
     // Key data may be invalid, and will be validated on the device
@@ -125,6 +126,7 @@ static ErrorCode import_key_rsa(const tag_map_t& params,
     bssl::UniquePtr<uint8_t> n_buf(
         reinterpret_cast<uint8_t *>(OPENSSL_malloc(BN_num_bytes(n))));
     if (!BN_bn2le_padded(n_buf.get(), BN_num_bytes(n), n)) {
+        LOG(ERROR) << "ImportKey request: bn2le_padded failed";
         return ErrorCode::UNKNOWN_ERROR;
     }
     request->mutable_rsa()->set_n(n_buf.get(), BN_num_bytes(n));
@@ -189,12 +191,12 @@ static ErrorCode import_key_ec(const tag_map_t& params,
     if (curve_id != nullptr && *curve_id != parsed_curve_id) {
         // Parameter mis-match.
         LOG(ERROR) << "ImportKey: curve-id does not match PKCS8";
-        return ErrorCode::INVALID_ARGUMENT;
+        return ErrorCode::IMPORT_PARAMETER_MISMATCH;
     }
     if (key_size != nullptr && *key_size != parsed_key_size) {
         // Parameter mis-match.
         LOG(ERROR) << "ImportKey: key-size does not match PKCS8";
-        return ErrorCode::INVALID_ARGUMENT;
+        return ErrorCode::IMPORT_PARAMETER_MISMATCH;
     }
 
     const BIGNUM *d = EC_KEY_get0_private_key(ec_key);
@@ -257,17 +259,17 @@ static ErrorCode import_key_raw(const tag_map_t& params,
         key_size = &v[0].f.integer;
     }
 
-    if (key_size != nullptr && *key_size != keyData.size()) {
+    if (key_size != nullptr && *key_size != keyData.size() * 8) {
         LOG(ERROR) << "ImportKey request: mis-matched KEY_SIZE tag: "
                    << *key_size
                    << " provided data size: "
                    << keyData.size();
-        return ErrorCode::INVALID_ARGUMENT;
+        return ErrorCode::IMPORT_PARAMETER_MISMATCH;
     }
 
     if (keyData.size() == 0) {
         LOG(ERROR) << "ImportKey request: invalid key size 0";
-        return ErrorCode::INVALID_ARGUMENT;
+        return ErrorCode::IMPORT_PARAMETER_MISMATCH;
     }
 
     request->mutable_symmetric_key()->set_material(
@@ -280,7 +282,7 @@ ErrorCode import_key_request(const hidl_vec<KeyParameter>& params,
                              KeyFormat keyFormat,
                              const hidl_vec<uint8_t>& keyData,
                              ImportKeyRequest *request) {
-    const enum Algorithm *algorithm = nullptr;
+    const enum Algorithm *algorithm;
 
     if (keyFormat != KeyFormat::PKCS8 && keyFormat != KeyFormat::RAW) {
         return ErrorCode::UNSUPPORTED_KEY_FORMAT;
@@ -293,8 +295,11 @@ ErrorCode import_key_request(const hidl_vec<KeyParameter>& params,
         return error;
     }
 
-    if (tag_map.find(Tag::ALGORITHM) == tag_map.end()) {
+    if (tag_map.find(Tag::ALGORITHM) != tag_map.end()) {
         // Algorithm is a required parameter.
+        const vector<KeyParameter>& v = tag_map.find(Tag::ALGORITHM)->second;
+        algorithm = &v[0].f.algorithm;
+    } else {
         LOG(ERROR) << "ImportKey request: Algorithm Tag missing";
         return ErrorCode::INVALID_ARGUMENT;
     }

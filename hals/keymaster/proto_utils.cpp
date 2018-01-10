@@ -586,7 +586,7 @@ ErrorCode pb_to_key_parameter(const nosapp::KeyParameter& param,
 {
     switch (param.tag()) {
     case nosapp::Tag::TAG_INVALID:
-        LOG(ERROR) << "key_parameter_to_pb: invalid Tag received: "
+        LOG(ERROR) << "pb_to_key_parameter: invalid Tag received: "
                    << (uint32_t)param.tag();
         return ErrorCode::UNKNOWN_ERROR;
         break;
@@ -977,11 +977,14 @@ ErrorCode translate_error_code(nosapp::ErrorCode error_code)
         return ErrorCode::ROLLBACK_RESISTANCE_UNAVAILABLE;
     case nosapp::ErrorCode::HARDWARE_TYPE_UNAVAILABLE:
         return ErrorCode::HARDWARE_TYPE_UNAVAILABLE;
+    case nosapp::ErrorCode::PROOF_OF_PRESENCE_REQUIRED:
+        return ErrorCode::PROOF_OF_PRESENCE_REQUIRED;
+    case nosapp::ErrorCode::CONCURRENT_PROOF_OF_PRESENCE_REQUESTED:
+        return ErrorCode::CONCURRENT_PROOF_OF_PRESENCE_REQUESTED;
     case nosapp::ErrorCode::UNKNOWN_ERROR:
         return ErrorCode::UNKNOWN_ERROR;
     case nosapp::ErrorCode::ErrorCode_INT_MIN_SENTINEL_DO_NOT_USE_:
     case nosapp::ErrorCode::ErrorCode_INT_MAX_SENTINEL_DO_NOT_USE_:
-    default:
         LOG(ERROR) << "Unrecognized error_code: " << error_code;
         return ErrorCode::UNKNOWN_ERROR;
     }
