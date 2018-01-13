@@ -20,6 +20,9 @@ cc_defaults {
         "aidl/android/hardware/citadel/ICitadeld.aidl",
     ],
     defaults: ["nos_base_cc_defaults"],
+    header_libs: [
+        "nos_headers",
+    ],
     shared_libs: [
         "libbase",
         "libbinder",
@@ -49,11 +52,13 @@ cc_binary {
     init_rc: ["citadeld.rc"],
     srcs: [
         "main.cpp",
+        "check.cpp",
     ],
     defaults: ["citadeld_defaults"],
     shared_libs: [
         "libnos",
         "libnos_client_citadel",
+        "libnos_transport",
     ],
 }
 
@@ -68,7 +73,10 @@ cc_library {
     aidl: {
         export_aidl_headers: true,
     },
-    header_libs: [
-        "nos_headers",
-    ],
+}
+
+cc_binary {
+    name: "citadel_test",
+    srcs: ["citadel_test.cpp"],
+    defaults: ["citadeld_defaults"],
 }

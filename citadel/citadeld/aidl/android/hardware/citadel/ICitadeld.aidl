@@ -27,4 +27,7 @@ interface ICitadeld {
      * @return         Status code from the app.
      */
     int callApp(int appId, int arg, in byte[] request, out byte[] response);
+
+    /** Runs a series of checks to ensure the devices is present, connected and responsive. */
+    boolean checkDevice();
 }
