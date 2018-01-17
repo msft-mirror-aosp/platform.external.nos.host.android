@@ -14,10 +14,8 @@
 // limitations under the License.
 //
 
-// Defaults for the libnos HAL implementations and services
 cc_defaults {
     name: "nos_hal_defaults",
-    defaults: ["nos_cc_hw_defaults"],
     header_libs: [
         "nos_headers",
     ],
@@ -28,5 +26,23 @@ cc_defaults {
         "libnos",
         "libnosprotos",
         "libutils",
+    ],
+}
+
+// Defaults for the libnos HAL services
+cc_defaults {
+    name: "nos_hal_service_defaults",
+    defaults: [
+        "nos_cc_hw_defaults",
+        "nos_hal_defaults",
+    ],
+}
+
+// Defaults for the libnos HAL implementation libraries
+cc_defaults {
+    name: "nos_hal_impl_defaults",
+    defaults: [
+        "nos_cc_defaults",
+        "nos_hal_defaults",
     ],
 }
