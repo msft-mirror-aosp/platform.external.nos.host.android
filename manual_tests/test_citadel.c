@@ -890,6 +890,29 @@ out:
 
 /****************************************************************************/
 
+/*
+ * Any SPI bus activity will wake Citadel from deep sleep, so we'll just send
+ * it a single bogus command. If Citadel's already awake, it will ignore it.
+ * We don't bother tracking or reporting errors. The test will report any real
+ * errors.
+ */
+#define IGNORED_COMMAND 0x00ffffff
+static void poke_citadel(void)
+{
+	struct nos_device dev;
+	int rv;
+
+	if (nos_device_open(option.device, &dev) != 0)
+		return;
+
+	rv = dev.ops.write(dev.ctx, IGNORED_COMMAND, 0, 0);
+	dev.ops.close(dev.ctx);
+
+	/* If Citadel was asleep, give it some time to wake up */
+	if (rv == -EAGAIN)
+		usleep(50000);
+}
+
 int main(int argc, char *argv[])
 {
 	int i;
@@ -967,14 +990,15 @@ int main(int argc, char *argv[])
 	if (errorcnt)
 		return !!errorcnt;
 
+	/* Wake Citadel from deep sleep */
+	poke_citadel();
+
 	/*
 	 * We can freely intermingle options and args, so the function should
 	 * be the first non-option. Try to pick it out if it exists.
 	 */
 	if (argc > optind) {
-		if (!strcmp("help", argv[optind]))
-			usage(this_prog);
-		else if (!strcmp("tpm", argv[optind]))
+		if (!strcmp("tpm", argv[optind]))
 			do_tpm(argc - optind, argv + optind);
 		else if (!strcmp("app", argv[optind]))
 			do_app(argc - optind, argv + optind);

@@ -15,11 +15,14 @@
 //
 
 cc_defaults {
-    name: "citadeld_base_defaults",
+    name: "citadeld_defaults",
     srcs: [
         "aidl/android/hardware/citadel/ICitadeld.aidl",
     ],
-    defaults: ["nos_base_cc_defaults"],
+    defaults: ["nos_cc_defaults"],
+    header_libs: [
+        "nos_headers",
+    ],
     shared_libs: [
         "libbase",
         "libbinder",
@@ -29,18 +32,10 @@ cc_defaults {
 }
 
 cc_defaults {
-    name: "citadeld_defaults",
+    name: "citadeld_hw_defaults",
     defaults: [
-        "citadeld_base_defaults",
-        "nos_cc_defaults",
-    ],
-}
-
-cc_defaults {
-    name: "citadeld_shared_defaults",
-    defaults: [
-        "citadeld_base_defaults",
-        "nos_base_cc_defaults",
+        "nos_cc_hw_defaults",
+        "citadeld_defaults",
     ],
 }
 
@@ -49,12 +44,20 @@ cc_binary {
     init_rc: ["citadeld.rc"],
     srcs: [
         "main.cpp",
+        "check.cpp",
     ],
-    defaults: ["citadeld_defaults"],
+    defaults: ["citadeld_hw_defaults"],
     shared_libs: [
         "libnos",
         "libnos_client_citadel",
+        "libnos_transport",
     ],
+}
+
+cc_binary {
+    name: "citadel_test",
+    srcs: ["citadel_test.cpp"],
+    defaults: ["citadeld_hw_defaults"],
 }
 
 cc_library {
@@ -62,13 +65,10 @@ cc_library {
     srcs: [
         "CitadeldProxyClient.cpp",
     ],
-    defaults: ["citadeld_shared_defaults"],
+    defaults: ["citadeld_defaults"],
     export_include_dirs: ["include"],
     export_shared_lib_headers: ["libbinder"],
     aidl: {
         export_aidl_headers: true,
     },
-    header_libs: [
-        "nos_headers",
-    ],
 }

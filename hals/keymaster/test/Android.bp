@@ -23,7 +23,7 @@ cc_test {
         "import_key_test.cpp",
         "import_wrapped_key_test.cpp",
     ],
-    defaults: ["nos_hal_defaults"],
+    defaults: ["nos_hal_impl_defaults"],
     cflags: [
         // Needed for compiling BoringSSL.
         "-Wno-gnu-anonymous-struct",

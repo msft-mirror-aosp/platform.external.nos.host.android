@@ -17,7 +17,7 @@
 cc_library {
     name: "libnos_datagram_citadel",
     srcs: ["citadel.c"],
-    defaults: ["nos_base_cc_defaults"],
+    defaults: ["nos_cc_defaults"],
     shared_libs: [
         "libnos_datagram",
     ],
