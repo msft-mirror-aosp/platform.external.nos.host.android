@@ -24,6 +24,8 @@
 
 #include <android/hardware/citadel/BnCitadeld.h>
 
+#include "check.h"
+
 using ::android::OK;
 using ::android::defaultServiceManager;
 using ::android::sp;
@@ -35,7 +37,6 @@ using ::android::ProcessState;
 using ::android::binder::Status;
 
 using ::nos::NuggetClient;
-using ::nos::NuggetClientInterface;
 
 using ::android::hardware::citadel::BnCitadeld;
 using ::android::hardware::citadel::ICitadeld;
@@ -43,9 +44,9 @@ using ::android::hardware::citadel::ICitadeld;
 namespace {
 
 struct CitadelProxy : public BnCitadeld {
-    NuggetClientInterface& _client;
+    NuggetClient& _client;
 
-    CitadelProxy(NuggetClientInterface& client) : _client{client} {}
+    CitadelProxy(NuggetClient& client) : _client{client} {}
     ~CitadelProxy() override = default;
 
     Status callApp(const int32_t _appId, const int32_t _arg, const std::vector<uint8_t>& request,
@@ -60,6 +61,17 @@ struct CitadelProxy : public BnCitadeld {
         uint32_t* const appStatus = reinterpret_cast<uint32_t*>(_aidl_return);
 
         *appStatus = _client.CallApp(appId, arg, request, response);
+        return Status::ok();
+    }
+
+    Status checkDevice(bool* const _aidl_return) override {
+        LOG(INFO) << "Running citadel device checks...";
+        *_aidl_return = android::citadeld::CheckDevice(_client.Device());
+        if (*_aidl_return) {
+            LOG(INFO) << "Citadel device check passed";
+        } else {
+            LOG(ERROR) << "Citadel device check failed";
+        }
         return Status::ok();
     }
 };

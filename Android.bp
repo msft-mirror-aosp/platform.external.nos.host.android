@@ -14,9 +14,9 @@
 // limitations under the License.
 //
 
-// The language related defaults
+// Language and vendor related defaults
 cc_defaults {
-    name: "nos_lang_cc_defaults",
+    name: "nos_cc_defaults",
     clang: true,
     cflags: [
         "-pedantic",
@@ -27,26 +27,20 @@ cc_defaults {
     conlyflags: [
         "-std=c11",
     ],
-}
-
-// Language and vendor related defaults
-cc_defaults {
-    name: "nos_base_cc_defaults",
-    defaults: ["nos_lang_cc_defaults"],
     vendor: true,
     owner: "google",
 }
 
-// Defaults for components shared between the host and device
+// Defaults for components under the hw subdirectory
 cc_defaults {
-    name: "nos_shared_cc_defaults",
-    defaults: ["nos_base_cc_defaults"],
-    host_supported: true,
+    name: "nos_cc_hw_defaults",
+    defaults: ["nos_cc_defaults"],
+    relative_install_path: "hw",
 }
 
-// Defaults for device executables
+// Defaults for components shared between the host and device
 cc_defaults {
-    name: "nos_cc_defaults",
-    defaults: ["nos_base_cc_defaults"],
-    relative_install_path: "hw",
+    name: "nos_cc_host_supported_defaults",
+    defaults: ["nos_cc_defaults"],
+    host_supported: true,
 }

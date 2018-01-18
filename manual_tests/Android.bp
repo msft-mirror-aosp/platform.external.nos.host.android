@@ -14,18 +14,13 @@
 // limitations under the License.
 //
 
-cc_defaults {
-    name: "manual_tests_cc_defaults",
-    defaults: ["nos_cc_defaults"],
-    header_libs: [
-        "nos_headers",
-    ],
-}
-
 cc_binary {
     name: "test_citadel",
     srcs: ["test_citadel.c"],
-    defaults: ["manual_tests_cc_defaults"],
+    defaults: ["nos_cc_hw_defaults"],
+    header_libs: [
+        "nos_headers",
+    ],
     static_libs: [
         "libnos_datagram",
         "libnos_datagram_citadel",

@@ -22,7 +22,7 @@ cc_library {
         "KeymasterDevice.cpp",
         "proto_utils.cpp",
     ],
-    defaults: ["nos_hal_defaults"],
+    defaults: ["nos_hal_impl_defaults"],
     cflags: [
         // Needed for compiling BoringSSL.
         "-Wno-gnu-anonymous-struct",

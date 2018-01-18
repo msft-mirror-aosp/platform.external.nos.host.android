@@ -23,6 +23,8 @@
 #include <nos/debug.h>
 #include <nos/NuggetClient.h>
 
+#include <keymasterV4_0/key_param_output.h>
+
 #include <android-base/logging.h>
 
 namespace android {
@@ -114,7 +116,7 @@ static ErrorCode status_to_error_code(uint32_t status)
     }                                                                         \
     if (error_code != ErrorCode::OK) {                                        \
         LOG(ERROR) << #meth << " : device response error code: "              \
-                   << (int32_t) error_code;                                   \
+                   << error_code;                                             \
         return error_code;                                                    \
     }                                                                         \
 }
@@ -130,7 +132,7 @@ static ErrorCode status_to_error_code(uint32_t status)
     }                                                                         \
     if (error_code != ErrorCode::OK) {                                        \
         LOG(ERROR) << #meth << " : device response error code: "              \
-                   << (int32_t) error_code;                                   \
+                   << error_code;                                             \
         /* TODO: translate error codes. */                                    \
         _hidl_cb(error_code, __VA_ARGS__);                                    \
         return Void();                                                        \
@@ -198,14 +200,18 @@ Return<ErrorCode> KeymasterDevice::addRngEntropy(const hidl_vec<uint8_t>& data)
 
     if (!data.size()) return ErrorCode::OK;
 
-    AddRngEntropyRequest request;
-    AddRngEntropyResponse response;
-    request.set_data(&data[0], data.size());
+    const size_t chunk_size = 1024;
+    for (size_t i = 0; i < data.size(); i += chunk_size) {
+        AddRngEntropyRequest request;
+        AddRngEntropyResponse response;
 
-    // Call device.
-    KM_CALL(AddRngEntropy);
+        request.set_data(&data[i], std::min(chunk_size, data.size() - i));
 
-    return (ErrorCode)response.error_code();
+        // Call device.
+        KM_CALL(AddRngEntropy);
+    }
+
+    return ErrorCode::OK;
 }
 
 Return<void> KeymasterDevice::generateKey(
@@ -237,7 +243,8 @@ Return<void> KeymasterDevice::generateKey(
     pb_to_hidl_params(response.characteristics().tee_enforced(),
                       &characteristics.hardwareEnforced);
 
-    _hidl_cb((ErrorCode)response.error_code(), blob, characteristics);
+    _hidl_cb(translate_error_code(response.error_code()),
+             blob, characteristics);
     return Void();
 }
 
@@ -265,7 +272,7 @@ Return<void> KeymasterDevice::getKeyCharacteristics(
     pb_to_hidl_params(response.characteristics().tee_enforced(),
                       &characteristics.hardwareEnforced);
 
-    _hidl_cb((ErrorCode)response.error_code(), characteristics);
+    _hidl_cb(translate_error_code(response.error_code()), characteristics);
     return Void();
 }
 
@@ -282,7 +289,7 @@ Return<void> KeymasterDevice::importKey(
     error = import_key_request(params, keyFormat, keyData, &request);
     if (error != ErrorCode::OK) {
         LOG(ERROR) << "ImportKey request parsing failed with error "
-                   << (uint32_t)error;
+                   << error;
         _hidl_cb(error, hidl_vec<uint8_t>{}, KeyCharacteristics{});
         return Void();
     }
@@ -302,7 +309,7 @@ Return<void> KeymasterDevice::importKey(
                               &characteristics.hardwareEnforced);
     if (error != ErrorCode::OK) {
         LOG(ERROR) << "KeymasterDevice::importKey: response tee_enforced :"
-                   << (uint32_t)error;
+                   << error;
         _hidl_cb(error, hidl_vec<uint8_t>{}, KeyCharacteristics{});
         return Void();
     }
@@ -334,7 +341,7 @@ Return<void> KeymasterDevice::exportKey(
             const_cast<char*>(response.key_material().data())),
         response.key_material().size(), false);
 
-    _hidl_cb((ErrorCode)response.error_code(), blob);
+    _hidl_cb(translate_error_code(response.error_code()), blob);
     return Void();
 }
 
@@ -369,7 +376,7 @@ Return<void> KeymasterDevice::attestKey(
         chain.push_back(blob);
     }
 
-    _hidl_cb((ErrorCode)response.error_code(),
+    _hidl_cb(translate_error_code(response.error_code()),
              hidl_vec<hidl_vec<uint8_t> >(chain));
     return Void();
 }
@@ -401,7 +408,7 @@ Return<void> KeymasterDevice::upgradeKey(
             const_cast<char*>(response.blob().blob().data())),
         response.blob().blob().size(), false);
 
-    _hidl_cb((ErrorCode)response.error_code(), blob);
+    _hidl_cb(translate_error_code(response.error_code()), blob);
     return Void();
 }
 
@@ -416,7 +423,7 @@ Return<ErrorCode> KeymasterDevice::deleteKey(const hidl_vec<uint8_t>& keyBlob)
 
     KM_CALL(DeleteKey);
 
-    return (ErrorCode)response.error_code();
+    return translate_error_code(response.error_code());
 }
 
 Return<ErrorCode> KeymasterDevice::deleteAllKeys()
@@ -428,7 +435,7 @@ Return<ErrorCode> KeymasterDevice::deleteAllKeys()
 
     KM_CALL(DeleteAllKeys);
 
-    return (ErrorCode)response.error_code();
+    return translate_error_code(response.error_code());
 }
 
 Return<ErrorCode> KeymasterDevice::destroyAttestationIds()
@@ -440,7 +447,7 @@ Return<ErrorCode> KeymasterDevice::destroyAttestationIds()
 
     KM_CALL(DestroyAttestationIds);
 
-    return (ErrorCode)response.error_code();
+    return translate_error_code(response.error_code());
 }
 
 Return<void> KeymasterDevice::begin(
@@ -471,7 +478,7 @@ Return<void> KeymasterDevice::begin(
 
     pb_to_hidl_params(response.params(), &params);
 
-    _hidl_cb((ErrorCode)response.error_code(), params,
+    _hidl_cb(translate_error_code(response.error_code()), params,
              response.handle().handle());
     return Void();
 }
@@ -594,7 +601,7 @@ Return<void> KeymasterDevice::importWrappedKey(
                                        maskingKey, &request);
     if (error != ErrorCode::OK) {
         LOG(ERROR) << "ImportWrappedKey request parsing failed with error "
-                   << (uint32_t)error;
+                   << error;
         _hidl_cb(error, hidl_vec<uint8_t>{}, KeyCharacteristics{});
         return Void();
     }
@@ -616,7 +623,7 @@ Return<void> KeymasterDevice::importWrappedKey(
     if (error != ErrorCode::OK) {
         LOG(ERROR) <<
             "KeymasterDevice::importWrappedKey: response tee_enforced :"
-                   << (uint32_t)error;
+                   << error;
         _hidl_cb(error, hidl_vec<uint8_t>{}, KeyCharacteristics{});
         return Void();
     }

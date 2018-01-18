@@ -55,24 +55,24 @@ static int read_datagram(void *ctx, uint32_t command, uint8_t *buf, uint32_t len
 
     if (!ctx) {
         fprintf(stderr, "%s: invalid (NULL) device\n", __func__);
-        return -1;
+        return -ENODEV;
     }
     fd = *(int *)ctx;
     if (fd < 0) {
         fprintf(stderr, "%s: invalid device\n", __func__);
-        return -2;
+        return -ENODEV;
     }
 
     if (len > MAX_DEVICE_TRANSFER) {
         fprintf(stderr, "%s: invalid len (%d > %d)\n", __func__,
             len, MAX_DEVICE_TRANSFER);
-        return -3;
+        return -E2BIG;
     }
 
     ret = ioctl(fd, CITADEL_IOC_TPM_DATAGRAM, &dg);
     if (ret < 0) {
         perror("can't send spi message");
-        return ret;
+        return -errno;
     }
 
     memcpy(buf, in_buf, len);
@@ -92,18 +92,18 @@ static int write_datagram(void *ctx, uint32_t command, const uint8_t *buf, uint3
 
     if (!ctx) {
         fprintf(stderr, "%s: invalid (NULL) device\n", __func__);
-        return -1;
+        return -ENODEV;
     }
     fd = *(int *)ctx;
     if (fd < 0) {
         fprintf(stderr, "%s: invalid device\n", __func__);
-        return -2;
+        return -ENODEV;
     }
 
     if (len > MAX_DEVICE_TRANSFER) {
         fprintf(stderr, "%s: invalid len (%d > %d)\n", __func__,
             len, MAX_DEVICE_TRANSFER);
-        return -3;
+        return -E2BIG;
     }
 
     memcpy(out_buf, buf, len);
@@ -111,7 +111,7 @@ static int write_datagram(void *ctx, uint32_t command, const uint8_t *buf, uint3
     ret = ioctl(fd, CITADEL_IOC_TPM_DATAGRAM, &dg);
     if (ret < 0) {
         perror("can't send spi message");
-        return ret;
+        return -errno;
     }
 
     return 0;
@@ -121,12 +121,12 @@ static void close_device(void *ctx) {
     int fd;
 
     if (!ctx) {
-        fprintf(stderr, "%s: invalid (NULL) device\n", __func__);
+        fprintf(stderr, "%s: invalid (NULL) device (ignored)\n", __func__);
         return;
     }
     fd = *(int *)ctx;
     if (fd < 0) {
-        fprintf(stderr, "%s: invalid device\n", __func__);
+        fprintf(stderr, "%s: invalid device (ignored)\n", __func__);
         return;
     }
 
@@ -141,14 +141,14 @@ int nos_device_open(const char *device_name, struct nos_device *dev) {
     fd = open(device_name ? device_name : DEV_CITADEL, O_RDWR);
     if (fd < 0) {
         perror("can't open device");
-        return -1;
+        return -errno;
     }
 
     new_fd = (int *)malloc(sizeof(int));
     if (!new_fd) {
         perror("can't malloc new fd");
         close(fd);
-        return -1;
+        return -ENOMEM;
     }
     *new_fd = fd;
 
