@@ -496,6 +496,18 @@ Return<void> KeymasterDevice::update(
     UpdateOperationRequest request;
     UpdateOperationResponse response;
 
+    if (input.size() > KM_MAX_PROTO_FIELD_SIZE) {
+        LOG(ERROR) << "Excess input length: " << input.size()
+                   << "max allowed: " << KM_MAX_PROTO_FIELD_SIZE;
+        if (this->abort(operationHandle) != ErrorCode::OK) {
+            LOG(ERROR) << "abort( " << operationHandle
+                       << ") failed";
+        }
+        _hidl_cb(ErrorCode::INVALID_INPUT_LENGTH, 0,
+                 hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
+        return Void();
+    }
+
     request.mutable_handle()->set_handle(operationHandle);
 
     hidl_vec<KeyParameter> params;
@@ -535,6 +547,18 @@ Return<void> KeymasterDevice::finish(
 
     FinishOperationRequest request;
     FinishOperationResponse response;
+
+    if (input.size() > KM_MAX_PROTO_FIELD_SIZE) {
+        LOG(ERROR) << "Excess input length: " << input.size()
+                   << "max allowed: " << KM_MAX_PROTO_FIELD_SIZE;
+        if (this->abort(operationHandle) != ErrorCode::OK) {
+            LOG(ERROR) << "abort( " << operationHandle
+                       << ") failed";
+        }
+        _hidl_cb(ErrorCode::INVALID_INPUT_LENGTH,
+                 hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
+        return Void();
+    }
 
     request.mutable_handle()->set_handle(operationHandle);
 
