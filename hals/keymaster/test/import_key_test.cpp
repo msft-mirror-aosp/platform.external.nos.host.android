@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-#include <hal_support.h>
 #include <../proto_utils.h>
 
 #include <MockKeymaster.client.h>
 #include <KeymasterDevice.h>
+
+#include <keymasterV4_0/keymaster_tags.h>
 
 #include <android-base/logging.h>
 #include <gtest/gtest.h>
