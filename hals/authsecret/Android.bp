@@ -19,7 +19,7 @@ cc_library {
     srcs: [
         "AuthSecret.cpp",
     ],
-    defaults: ["nos_hal_defaults"],
+    defaults: ["nos_hal_impl_defaults"],
     shared_libs: [
         "android.hardware.authsecret@1.0",
         "libprotobuf-cpp-full",
