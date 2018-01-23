@@ -371,10 +371,17 @@ TEST(KeymasterHalTest, importWrappedKeyRAWSuccess) {
         .WillOnce(DoAll(SetArgPointee<1>(response), Return(APP_SUCCESS)));
 
     KeymasterDevice hal{mockService};
+    /*
+     * TODO: extend test cases & matchers to include unwrappingParams,
+     * passwordSid, biometricSid.
+     */
     hal.importWrappedKey(
         WRAPPED_KEY_DER,
         wrapping_key_blob,
         masking_key,
+        {}, /* unwrappingParams */
+        0,  /* passwordSid */
+        0,  /* biometricSid */
         [&](ErrorCode error, hidl_vec<uint8_t> blob,
           KeyCharacteristics characteristics) {
 

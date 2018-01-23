@@ -583,6 +583,8 @@ Return<void> KeymasterDevice::importWrappedKey(
     const hidl_vec<uint8_t>& wrappedKeyData,
     const hidl_vec<uint8_t>& wrappingKeyBlob,
     const hidl_vec<uint8_t>& maskingKey,
+    const hidl_vec<KeyParameter>& /* unwrappingParams */,
+    uint64_t /* passwordSid */, uint64_t /* biometricSid */,
     importWrappedKey_cb _hidl_cb)
 {
     LOG(VERBOSE) << "Running KeymasterDevice::importWrappedKey";
