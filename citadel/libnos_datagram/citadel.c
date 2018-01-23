@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/select.h>
 #include <unistd.h>
 
 /*****************************************************************************/
@@ -117,6 +118,18 @@ static int write_datagram(void *ctx, uint32_t command, const uint8_t *buf, uint3
     return 0;
 }
 
+static void wait_for_interrupt(void *ctx) {
+    fd_set fds;
+    int fd = *(int *)ctx;
+
+    FD_ZERO(&fds);
+    FD_SET(fd, &fds);
+
+    if (select(1 /*nfds*/, &fds, NULL, NULL, NULL) < 0) {
+        perror("select");
+    }
+}
+
 static void close_device(void *ctx) {
     int fd;
 
@@ -155,6 +168,7 @@ int nos_device_open(const char *device_name, struct nos_device *dev) {
     dev->ctx = new_fd;
     dev->ops.read = read_datagram;
     dev->ops.write = write_datagram;
+    dev->ops.wait_for_interrupt = wait_for_interrupt;
     dev->ops.close = close_device;
     return 0;
 }
