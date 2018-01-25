@@ -248,7 +248,8 @@ static ErrorCode import_key_raw(const tag_map_t& params,
                                 const hidl_vec<uint8_t>& keyData,
                                 ImportKeyRequest *request)
 {
-    if (algorithm != Algorithm::AES && algorithm != Algorithm::HMAC) {
+  if (algorithm != Algorithm::AES && algorithm != Algorithm::TRIPLE_DES &&
+      algorithm != Algorithm::HMAC) {
         LOG(ERROR) << "ImportKey request: unsupported algorithm";
         return ErrorCode::UNSUPPORTED_ALGORITHM;
     }
@@ -259,12 +260,24 @@ static ErrorCode import_key_raw(const tag_map_t& params,
         key_size = &v[0].f.integer;
     }
 
-    if (key_size != nullptr && *key_size != keyData.size() * 8) {
-        LOG(ERROR) << "ImportKey request: mis-matched KEY_SIZE tag: "
-                   << *key_size
-                   << " provided data size: "
-                   << keyData.size();
-        return ErrorCode::IMPORT_PARAMETER_MISMATCH;
+    if (algorithm != Algorithm::TRIPLE_DES) {
+        if (key_size != nullptr && *key_size != keyData.size() * 8) {
+            LOG(ERROR) << "ImportKey request: mis-matched KEY_SIZE tag: "
+                       << ((key_size == NULL) ? -1 : *key_size)
+                       << " provided data size: "
+                       << keyData.size();
+            return ErrorCode::IMPORT_PARAMETER_MISMATCH;
+        }
+    } else {
+        if ((key_size != nullptr && *key_size != 168) ||
+            keyData.size() != 24) {
+            LOG(ERROR) << "ImportKey request: mis-matched DES KEY_SIZE tag: "
+                       << ((key_size == NULL) ? -1 : *key_size)
+                       << " provided data size: "
+                       << keyData.size();
+            return ErrorCode::IMPORT_PARAMETER_MISMATCH;
+        }
+        LOG(ERROR) << "ImportKey request: DES OK: ";
     }
 
     if (keyData.size() == 0) {

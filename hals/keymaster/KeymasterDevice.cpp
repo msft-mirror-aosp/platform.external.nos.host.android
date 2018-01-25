@@ -15,6 +15,7 @@
  */
 
 #include "KeymasterDevice.h"
+#include "export_key.h"
 #include "import_key.h"
 #include "import_wrapped_key.h"
 #include "proto_utils.h"
@@ -133,7 +134,6 @@ static ErrorCode status_to_error_code(uint32_t status)
     if (error_code != ErrorCode::OK) {                                        \
         LOG(ERROR) << #meth << " : device response error code: "              \
                    << error_code;                                             \
-        /* TODO: translate error codes. */                                    \
         _hidl_cb(error_code, __VA_ARGS__);                                    \
         return Void();                                                        \
     }                                                                         \
@@ -335,13 +335,15 @@ Return<void> KeymasterDevice::exportKey(
 
     KM_CALLV(ExportKey, hidl_vec<uint8_t>{});
 
-    hidl_vec<uint8_t> blob;
-    blob.setToExternal(
-        reinterpret_cast<uint8_t*>(
-            const_cast<char*>(response.key_material().data())),
-        response.key_material().size(), false);
+    ErrorCode error_code = translate_error_code(response.error_code());
+    if (error_code != ErrorCode::OK) {
+        _hidl_cb(error_code, hidl_vec<uint8_t>{});
+    }
 
-    _hidl_cb(translate_error_code(response.error_code()), blob);
+    hidl_vec<uint8_t> der;
+    error_code = export_key_der(response, &der);
+
+    _hidl_cb(error_code, der);
     return Void();
 }
 
