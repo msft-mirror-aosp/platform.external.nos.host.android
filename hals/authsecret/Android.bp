@@ -14,17 +14,19 @@
 // limitations under the License.
 //
 
-cc_test {
-    name: "android.hardware.authsecret@1.0-impl.nos_test",
+cc_library {
+    name: "android.hardware.authsecret@1.0-impl.nos",
     srcs: [
-        "test.cpp",
+        "AuthSecret.cpp",
     ],
-    defaults: ["nos_hal_defaults"],
-    header_libs: ["nos_headers"],
-    static_libs: ["libgmock"],
+    defaults: ["nos_hal_impl_defaults"],
+    cflags: [
+        "-Wno-gnu-anonymous-struct",
+        "-Wno-nested-anon-types",
+    ],
     shared_libs: [
         "android.hardware.authsecret@1.0",
-        "android.hardware.authsecret@1.0-impl.nos",
-        "libprotobuf-cpp-full",
+        "libcrypto",
     ],
+    export_include_dirs: ["include"],
 }
