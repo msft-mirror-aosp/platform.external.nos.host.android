@@ -22,13 +22,13 @@
 #include <getopt.h>
 #include <linux/types.h>
 #include <log/log.h>
+#include <poll.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
-#include <sys/select.h>
 #include <unistd.h>
 
 /*****************************************************************************/
@@ -127,14 +127,12 @@ static int write_datagram(void *ctx, uint32_t command, const uint8_t *buf, uint3
 }
 
 static void wait_for_interrupt(void *ctx) {
-    fd_set fds;
     int fd = *(int *)ctx;
+    struct pollfd fds = {fd, POLLIN, 0};
 
-    FD_ZERO(&fds);
-    FD_SET(fd, &fds);
-
-    if (select(1 /*nfds*/, &fds, NULL, NULL, NULL) < 0) {
-        aperror("select");
+    // poll() was used because select() doesn't work here for some reason.
+    if (poll(&fds, 1 /*nfds*/, -1) < 0) {
+        aperror("poll");
     }
 }
 

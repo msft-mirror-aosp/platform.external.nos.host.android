@@ -15,11 +15,13 @@
  */
 
 #include <limits>
+#include <thread>
 
 #include <android-base/logging.h>
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 
+#include <nos/device.h>
 #include <nos/NuggetClient.h>
 
 #include <android/hardware/citadel/BnCitadeld.h>
@@ -76,6 +78,19 @@ struct CitadelProxy : public BnCitadeld {
     }
 };
 
+[[noreturn]] void CitadelEventDispatcher(const nos_device& device) {
+    LOG(INFO) << "Event dispatcher startup.";
+    while(1) {
+        device.ops.wait_for_interrupt(device.ctx);
+        LOG(INFO) << "Citadel has dispatched an event";
+
+        // This is a placeholder for the message handling that gives citadel a
+        // chance to deassert CTLD_AP_IRQ, so this doesn't spam the logs.
+        // TODO(b/62713383) Replace this with the code to contact citadel.
+        sleep(1);
+    }
+}
+
 } // namespace
 
 int main() {
@@ -97,6 +112,10 @@ int main() {
     if (status != OK) {
         LOG(FATAL) << "Failed to register citadeld as a service (status " << status << ")";
     }
+
+    // Handle interrupts triggered by Citadel and dispatch any events to
+    // registered listeners.
+    std::thread event_dispatcher(CitadelEventDispatcher, *citadel.Device());
 
     // The driver only support single threaded access so we only need to process
     // Binder transactions on a single thread.
