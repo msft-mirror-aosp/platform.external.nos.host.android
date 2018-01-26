@@ -21,6 +21,7 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <linux/types.h>
+#include <log/log.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -44,6 +45,12 @@ struct citadel_ioc_tpm_datagram {
 
 #define DEV_CITADEL "/dev/citadel0"
 
+static void aperror(const char* msg) {
+  char buffer[80];
+  strerror_r(errno, buffer, sizeof(buffer));
+  ALOGE("%s: %s", msg, buffer);
+}
+
 static uint8_t in_buf[MAX_DEVICE_TRANSFER];
 static int read_datagram(void *ctx, uint32_t command, uint8_t *buf, uint32_t len) {
     struct citadel_ioc_tpm_datagram dg = {
@@ -55,24 +62,25 @@ static int read_datagram(void *ctx, uint32_t command, uint8_t *buf, uint32_t len
     int fd;
 
     if (!ctx) {
-        fprintf(stderr, "%s: invalid (NULL) device\n", __func__);
+
+        ALOGE("%s: invalid (NULL) device\n", __func__);
         return -ENODEV;
     }
     fd = *(int *)ctx;
     if (fd < 0) {
-        fprintf(stderr, "%s: invalid device\n", __func__);
+        ALOGE("%s: invalid device\n", __func__);
         return -ENODEV;
     }
 
     if (len > MAX_DEVICE_TRANSFER) {
-        fprintf(stderr, "%s: invalid len (%d > %d)\n", __func__,
+        ALOGE("%s: invalid len (%d > %d)\n", __func__,
             len, MAX_DEVICE_TRANSFER);
         return -E2BIG;
     }
 
     ret = ioctl(fd, CITADEL_IOC_TPM_DATAGRAM, &dg);
     if (ret < 0) {
-        perror("can't send spi message");
+        aperror("can't send spi message");
         return -errno;
     }
 
@@ -92,18 +100,18 @@ static int write_datagram(void *ctx, uint32_t command, const uint8_t *buf, uint3
     int fd;
 
     if (!ctx) {
-        fprintf(stderr, "%s: invalid (NULL) device\n", __func__);
+        ALOGE("%s: invalid (NULL) device\n", __func__);
         return -ENODEV;
     }
     fd = *(int *)ctx;
     if (fd < 0) {
-        fprintf(stderr, "%s: invalid device\n", __func__);
+        ALOGE("%s: invalid device\n", __func__);
         return -ENODEV;
     }
 
     if (len > MAX_DEVICE_TRANSFER) {
-        fprintf(stderr, "%s: invalid len (%d > %d)\n", __func__,
-            len, MAX_DEVICE_TRANSFER);
+        ALOGE("%s: invalid len (%d > %d)\n", __func__, len,
+            MAX_DEVICE_TRANSFER);
         return -E2BIG;
     }
 
@@ -111,7 +119,7 @@ static int write_datagram(void *ctx, uint32_t command, const uint8_t *buf, uint3
 
     ret = ioctl(fd, CITADEL_IOC_TPM_DATAGRAM, &dg);
     if (ret < 0) {
-        perror("can't send spi message");
+        aperror("can't send spi message");
         return -errno;
     }
 
@@ -126,7 +134,7 @@ static void wait_for_interrupt(void *ctx) {
     FD_SET(fd, &fds);
 
     if (select(1 /*nfds*/, &fds, NULL, NULL, NULL) < 0) {
-        perror("select");
+        aperror("select");
     }
 }
 
@@ -134,17 +142,17 @@ static void close_device(void *ctx) {
     int fd;
 
     if (!ctx) {
-        fprintf(stderr, "%s: invalid (NULL) device (ignored)\n", __func__);
+        ALOGE("%s: invalid (NULL) device (ignored)\n", __func__);
         return;
     }
     fd = *(int *)ctx;
     if (fd < 0) {
-        fprintf(stderr, "%s: invalid device (ignored)\n", __func__);
+        ALOGE("%s: invalid device (ignored)\n", __func__);
         return;
     }
 
     if (close(fd) < 0)
-        perror("Problem closing device (ignored)");
+        aperror("Problem closing device (ignored)");
     free(ctx);
 }
 
@@ -153,13 +161,13 @@ int nos_device_open(const char *device_name, struct nos_device *dev) {
 
     fd = open(device_name ? device_name : DEV_CITADEL, O_RDWR);
     if (fd < 0) {
-        perror("can't open device");
+        aperror("can't open device");
         return -errno;
     }
 
     new_fd = (int *)malloc(sizeof(int));
     if (!new_fd) {
-        perror("can't malloc new fd");
+        aperror("can't malloc new fd");
         close(fd);
         return -ENOMEM;
     }
