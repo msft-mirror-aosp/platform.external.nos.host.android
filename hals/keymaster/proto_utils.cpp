@@ -118,11 +118,8 @@ static nosapp::Algorithm translate_algorithm(Algorithm algorithm)
         return nosapp::Algorithm::EC;
     case Algorithm::AES:
         return nosapp::Algorithm::AES;
-#if 0
-    /* TODO: add support for DES. */
-    case Algorithm::DES:
+    case Algorithm::TRIPLE_DES:
         return nosapp::Algorithm::DES;
-#endif
     case Algorithm::HMAC:
         return nosapp::Algorithm::HMAC;
     default:
@@ -143,12 +140,9 @@ static ErrorCode translate_algorithm(nosapp::Algorithm algorithm,
     case nosapp::Algorithm::AES:
         *out = Algorithm::AES;
         break;
-#if 0
-    /* TODO: add support for DES. */
     case nosapp::Algorithm::DES:
-        *out = Algorithm::DES;
+        *out = Algorithm::TRIPLE_DES;
         break;
-#endif
     case nosapp::Algorithm::HMAC:
         *out = Algorithm::HMAC;
         break;
@@ -318,7 +312,7 @@ static nosapp::EcCurve translate_ec_curve(EcCurve ec_curve)
     }
 }
 
-static ErrorCode translate_ec_curve(nosapp::EcCurve ec_curve, EcCurve *out)
+ErrorCode translate_ec_curve(nosapp::EcCurve ec_curve, EcCurve *out)
 {
     switch (ec_curve) {
     case nosapp::EcCurve::P_224:

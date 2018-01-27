@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2017 The Android Open Source Project
+// Copyright (C) 2018 The Android Open Source Project
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,27 +15,14 @@
 //
 
 cc_library {
-    name: "android.hardware.keymaster@4.0-impl.nos",
+    name: "android.hardware.authsecret@1.0-impl.nos",
     srcs: [
-        "export_key.cpp",
-        "import_key.cpp",
-        "import_wrapped_key.cpp",
-        "KeymasterDevice.cpp",
-        "proto_utils.cpp",
+        "AuthSecret.cpp",
     ],
     defaults: ["nos_hal_impl_defaults"],
-    cflags: [
-        // Needed for compiling BoringSSL.
-        "-Wno-gnu-anonymous-struct",
-        "-Wno-nested-anon-types",
-    ],
     shared_libs: [
-        "android.hardware.keymaster@4.0",
-	"libkeymaster4support",
-        "libcrypto",
+        "android.hardware.authsecret@1.0",
         "libprotobuf-cpp-full",
-        "nos_app_keymaster",
-        "libhidltransport",
     ],
     export_include_dirs: ["include"],
 }
