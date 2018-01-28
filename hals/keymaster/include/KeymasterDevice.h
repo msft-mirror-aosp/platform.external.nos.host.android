@@ -36,6 +36,7 @@ using ::android::hardware::keymaster::V4_0::VerificationToken;
 using ::android::hardware::Return;
 using ::android::hardware::hidl_vec;
 
+#define KM_MAX_PROTO_FIELD_SIZE 2048
 
 using KeymasterClient = ::nugget::app::keymaster::IKeymaster;
 
