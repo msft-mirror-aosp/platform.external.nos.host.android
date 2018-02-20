@@ -41,6 +41,7 @@ struct citadel_ioc_tpm_datagram {
 };
 #define CITADEL_IOC_TPM_DATAGRAM    _IOW(CITADEL_IOC_MAGIC, 1, \
                          struct citadel_ioc_tpm_datagram)
+#define CITADEL_IOC_RESET           _IO(CITADEL_IOC_MAGIC, 2)
 /*****************************************************************************/
 
 #define DEV_CITADEL "/dev/citadel0"
@@ -136,6 +137,29 @@ static void wait_for_interrupt(void *ctx) {
     }
 }
 
+static int reset(void *ctx) {
+    int ret;
+    int fd;
+
+    if (!ctx) {
+
+        ALOGE("%s: invalid (NULL) device\n", __func__);
+        return -ENODEV;
+    }
+    fd = *(int *)ctx;
+    if (fd < 0) {
+        ALOGE("%s: invalid device\n", __func__);
+        return -ENODEV;
+    }
+
+    ret = ioctl(fd, CITADEL_IOC_RESET);
+    if (ret < 0) {
+        aperror("can't reset Citadel");
+        return -errno;
+    }
+    return 0;
+}
+
 static void close_device(void *ctx) {
     int fd;
 
@@ -175,6 +199,7 @@ int nos_device_open(const char *device_name, struct nos_device *dev) {
     dev->ops.read = read_datagram;
     dev->ops.write = write_datagram;
     dev->ops.wait_for_interrupt = wait_for_interrupt;
+    dev->ops.reset = reset;
     dev->ops.close = close_device;
     return 0;
 }
