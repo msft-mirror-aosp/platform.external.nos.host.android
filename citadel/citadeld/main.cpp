@@ -66,6 +66,12 @@ struct CitadelProxy : public BnCitadeld {
         return Status::ok();
     }
 
+    Status reset(bool* const _aidl_return) override {
+        const nos_device& device = *_client.Device();
+        *_aidl_return = (device.ops.reset(device.ctx) == 0);
+        return Status::ok();
+    }
+
     Status checkDevice(bool* const _aidl_return) override {
         LOG(INFO) << "Running citadel device checks...";
         *_aidl_return = android::citadeld::CheckDevice(_client.Device());
