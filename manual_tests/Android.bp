@@ -31,3 +31,9 @@ cc_binary {
         "liblog",
     ],
 }
+
+cc_binary {
+    name: "stupid",
+    srcs: ["stupid.c"],
+    defaults: ["nos_cc_hw_defaults"],
+}
