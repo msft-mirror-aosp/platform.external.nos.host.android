@@ -698,6 +698,8 @@ static void cit_interrupt(const char *name, uint32_t cit_gpio)
     uint32_t cit_bit;
     int rv;
 
+    printf("Test %s  Citadel gpio %d => AP kernel driver\n", name, cit_gpio);
+
     cit_bit = (1 << cit_gpio);
 
     debug(1, "%s(%s, %d) cit_bit 0x%08x\n", __func__, name, cit_gpio, cit_bit);
