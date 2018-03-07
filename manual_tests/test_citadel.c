@@ -905,9 +905,29 @@ static void poke_citadel(void)
         usleep(50000);
 }
 
+
+static int stopping_citadeld_fixed_it;
 static int connect_to_citadel(void)
 {
     int rv = nos_device_open(option.device, &dev);
+
+    if (rv == -EBUSY) {
+        /* Try stopping citadeld */
+        debug(1, "citadel device is busy, stopping citadeld...\n");
+        if (system("setprop ctl.stop vendor.citadeld") == 0) {
+            /* See if that helped */
+            rv = nos_device_open(option.device, &dev);
+            if (rv == 0) {
+                debug(1, "  okay, that worked\n");
+                stopping_citadeld_fixed_it = 1;
+                return rv;
+            } else {
+                debug(1, "  nope, didn't help\n");
+            }
+        } else {
+            debug(1, "  huh. couldn't stop it\n");
+        }
+    }
 
     if (rv)
         Error("Unable to connect to Citadel: %s", strerror(-rv));
@@ -918,6 +938,10 @@ static int connect_to_citadel(void)
 static void disconnect_from_citadel(void)
 {
     dev.ops.close(dev.ctx);
+    if (stopping_citadeld_fixed_it) {
+        debug(1, "We stopped citadeld earlier, so start it up again\n");
+        (void)system("setprop ctl.start vendor.citadeld");
+    }
 }
 
 int main(int argc, char *argv[])
