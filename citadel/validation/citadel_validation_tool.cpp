@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
+#include <chrono>
 #include <iomanip>
 #include <iostream>
-#include <limits>
 #include <random>
 
+#include <android-base/endian.h>
 #include <android-base/logging.h>
 #include <android-base/parseint.h>
 #include <binder/IServiceManager.h>
@@ -128,6 +129,23 @@ bool CheckRegisterNotInRange(NuggetClientInterface& client, uint32_t address,
     return true;
 }
 
+/* Have Nugget report the number of cycles it has been running for. */
+bool CyclesSinceBoot(NuggetClientInterface & client, uint32_t* cycles) {
+    std::vector<uint8_t> buffer;
+    buffer.reserve(sizeof(uint32_t));
+    if (client.CallApp(APP_ID_NUGGET, NUGGET_PARAM_CYCLES_SINCE_BOOT,
+                       buffer, &buffer) != app_status::APP_SUCCESS) {
+        std::cerr << "Failed to get cycles since boot\n";
+        return false;
+    }
+    if (buffer.size() != sizeof(uint32_t)) {
+        std::cerr << "Unexpected size of cycle count!\n";
+        return false;
+    }
+    *cycles = le32toh(*reinterpret_cast<uint32_t *>(buffer.data()));
+    return true;
+}
+
 /*
  * The current implementation of the test writes random vales to registers and
  * reads them back. This lets us check the correct values were sent across the
@@ -234,6 +252,37 @@ int CmdHealthCheck(NuggetClientInterface& client) {
     return ret;
 }
 
+int CmdReset(CitadeldProxyClient& client) {
+    // Request a hard reset of the device
+    bool success = false;
+    if (!client.Citadeld().reset(&success).isOk()) {
+        std::cerr << "Failed to talk to citadeld\n";
+        return EXIT_FAILURE;
+    }
+    if (!success) {
+        std::cerr << "Failed to reset Citadel\n";
+        return EXIT_FAILURE;
+    }
+
+    // Check the cycle count which should have been reset by the reset. It
+    // should be equivalent to around the time we just waited for but give it a
+    // 5% margin.
+    uint32_t cycles;
+    if (!CyclesSinceBoot(client, &cycles)) {
+        return EXIT_FAILURE;
+    }
+    const auto uptime = std::chrono::microseconds(cycles);
+    const auto bringup = std::chrono::milliseconds(100);
+    const auto limit = std::chrono::duration_cast<std::chrono::microseconds>(bringup) * 105 / 100;
+    if (uptime > limit) {
+        LOG(ERROR) << "Uptime is " << uptime.count()
+                   << "us but is expected to be less than " << limit.count() << "us\n";
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
 } // namespace
 
 /**
@@ -250,12 +299,16 @@ int main(int argc, char** argv) {
     if (argc >= 2) {
         const std::string command(argv[1]);
         char** params = &argv[2];
+        const int param_count = argc - 2;
 
-        if (command == "stress-spi") {
+        if (command == "stress-spi" && param_count == 1) {
             return CmdStressSpi(citadeldProxy, params);
         }
-        if (command == "health-check") {
+        if (command == "health-check" && param_count == 0) {
             return CmdHealthCheck(citadeldProxy);
+        }
+        if (command == "reset" && param_count == 0) {
+            return CmdReset(citadeldProxy);
         }
     }
 
@@ -263,6 +316,7 @@ int main(int argc, char** argv) {
     std::cerr << "Usage:\n";
     std::cerr << "  " << argv[0] << " stress-spi [count] -- perform count SPI transactions\n";
     std::cerr << "  " << argv[0] << " health-check       -- check Citadel's vital signs\n";
+    std::cerr << "  " << argv[0] << " reset              -- pull Citadel's reset line\n";
     std::cerr << "\n";
     std::cerr << "Returns 0 on success and non-0 if any failure were detected.\n";
     return EXIT_FAILURE;
