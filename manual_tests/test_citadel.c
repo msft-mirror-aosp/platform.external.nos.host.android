@@ -35,8 +35,8 @@
 #include <nos/device.h>
 #include <nos/transport.h>
 
-/* Opened here for use in transport.c */
-int verbose;
+/* Our connection to Citadel */
+static struct nos_device dev;
 
 /* Our big transfer buffer. Apps may have smaller size limits. */
 static uint8_t buf[0x4000];
@@ -237,7 +237,6 @@ static void do_tpm(int argc, char *argv[])
     char *e = 0;
     int i, rv, argcount, optind = 1;
     uint32_t command, buflen;
-    struct nos_device dev;
 
     /* Must have a command */
     if (optind < argc) {
@@ -270,11 +269,6 @@ static void do_tpm(int argc, char *argv[])
     }
 
     /* Okay, let's do something */
-    if (nos_device_open(option.device, &dev) != 0) {
-        Error("Unable to connect");
-        return;
-    }
-
     debug(1, "Command 0x%08x, buflen 0x%x\n", command, buflen);
 
     if (command & 0x80000000)
@@ -286,9 +280,6 @@ static void do_tpm(int argc, char *argv[])
         Error("%s: nuts", argv[0]);
     else if (command & 0x80000000)
         debug_buf(0, buf, buflen);
-
-    /* Done */
-    dev.ops.close(dev.ctx);
 }
 
 static void do_app(int argc, char *argv[])
@@ -296,7 +287,6 @@ static void do_app(int argc, char *argv[])
     char *e = 0;
     int optind = 1;
     uint32_t i, buflen, replycount, retval;
-    struct nos_device dev;
 
     /* preload BYTEs from command line */
     buflen = argc - optind;
@@ -309,12 +299,6 @@ static void do_app(int argc, char *argv[])
         optind++;
     }
 
-    /* Okay, let's do something */
-    if (nos_device_open(option.device, &dev) != 0) {
-        Error("Unable to connect");
-        return;
-    }
-
     debug(1, "AppID 0x%02x, App param 0x%04x, buflen 0x%x\n",
           option.app_id, option.param, buflen);
 
@@ -323,16 +307,12 @@ static void do_app(int argc, char *argv[])
                                   buf, buflen, buf, &replycount);
     debug_retval(1, retval, replycount);
     debug_buf(0, buf, replycount);
-
-    /* Done */
-    dev.ops.close(dev.ctx);
 }
 
 /****************************************************************************/
 /* Available for bringup/debug only. See b/65067435 */
 
-static uint32_t read32(const struct nos_device *dev, uint32_t address,
-                       uint32_t *valptr)
+static uint32_t read32(uint32_t address, uint32_t *valptr)
 {
     uint32_t buflen, replycount, retval;
 
@@ -340,7 +320,7 @@ static uint32_t read32(const struct nos_device *dev, uint32_t address,
     buflen = sizeof(address);
     memcpy(buf, &address, buflen);
     replycount = sizeof(buf);
-    retval = nos_call_application(dev, APP_ID_NUGGET, NUGGET_PARAM_READ32,
+    retval = nos_call_application(&dev, APP_ID_NUGGET, NUGGET_PARAM_READ32,
                                   buf, buflen, buf, &replycount);
     debug_retval(2, retval, replycount);
     if (replycount == sizeof(*valptr)) {
@@ -351,8 +331,7 @@ static uint32_t read32(const struct nos_device *dev, uint32_t address,
     return retval;
 }
 
-static uint32_t write32(const struct nos_device *dev, uint32_t address,
-                        uint32_t value)
+static uint32_t write32(uint32_t address, uint32_t value)
 {
     uint32_t buflen, replycount, retval;
     struct nugget_app_write32 w32;
@@ -364,7 +343,7 @@ static uint32_t write32(const struct nos_device *dev, uint32_t address,
     buflen = sizeof(w32);
     memcpy(buf, &w32, buflen);
     replycount = sizeof(buf);
-    retval = nos_call_application(dev, APP_ID_NUGGET, NUGGET_PARAM_WRITE32,
+    retval = nos_call_application(&dev, APP_ID_NUGGET, NUGGET_PARAM_WRITE32,
                                   buf, buflen, buf, &replycount);
     debug_retval(2, retval, replycount);
 
@@ -375,7 +354,6 @@ static void do_rw(int argc, char *argv[])
 {
     char *e = 0;
     uint32_t retval, address, value;
-    struct nos_device dev;
 
     argc = MIN(argc, 3);                        /* ignore any extra args */
     switch (argc) {
@@ -398,25 +376,17 @@ static void do_rw(int argc, char *argv[])
         return;
     }
 
-    /* Okay, let's do something */
-    if (nos_device_open(option.device, &dev) != 0) {
-        Error("Unable to connect");
-        return;
-    }
-
     if (argc == 2) {
-        retval = read32(&dev, address, &value);
+        retval = read32(address, &value);
         if (APP_SUCCESS != retval)
             Error("%s: Read failed", argv[0]);
         else
             printf("0x%08x\n", value);
     } else {
-        retval = write32(&dev, address, value);
+        retval = write32(address, value);
         if (APP_SUCCESS != retval)
             Error("%s: Write failed", argv[0]);
     }
-
-    dev.ops.close(dev.ctx);
 }
 
 /****************************************************************************/
@@ -434,7 +404,6 @@ static void do_rw(int argc, char *argv[])
 /* ARM GPIO config registers */
 #define GPIO_DATA     0x40550000
 #define GPIO_OUTENSET 0x40550010
-
 
 /* Return true on success */
 static int write_to_file(const char *filename, const char *string)
@@ -606,8 +575,7 @@ static int set_ap_value(uint32_t num, int val)
     return 1;
 }
 
-static void ap_wiggle(const struct nos_device *dev, const char *name,
-		      uint32_t cit_gpio, uint32_t ap_gpio)
+static void ap_wiggle(const char *name, uint32_t cit_gpio, uint32_t ap_gpio)
 {
     uint32_t prev, curr;
     uint32_t cit_bit;
@@ -627,7 +595,7 @@ static void ap_wiggle(const struct nos_device *dev, const char *name,
     /* drive low, confirm low */
     if (!set_ap_value(ap_gpio, 0))
         return;
-    if (0 != read32(dev, GPIO_DATA, &curr)) {
+    if (0 != read32(GPIO_DATA, &curr)) {
         Error("%s: can't read Citadel GPIOs", __func__);
         return;
     }
@@ -639,7 +607,7 @@ static void ap_wiggle(const struct nos_device *dev, const char *name,
     /* Drive high, confirm high, no other bits changed */
     if (!set_ap_value(ap_gpio, 1))
         return;
-    if (0 != read32(dev, GPIO_DATA, &curr)) {
+    if (0 != read32(GPIO_DATA, &curr)) {
         Error("%s: can't read Citadel GPIOs", __func__);
         return;
     }
@@ -653,7 +621,7 @@ static void ap_wiggle(const struct nos_device *dev, const char *name,
     /* Drive Low, confirm low again, no other bits changed */
     if (!set_ap_value(ap_gpio, 0))
         return;
-    if (0 != read32(dev, GPIO_DATA, &curr)) {
+    if (0 != read32(GPIO_DATA, &curr)) {
         Error("%s: can't read Citadel GPIOs", __func__);
         return;
     }
@@ -671,8 +639,7 @@ static void sig_handler(int sig)
     printf("Signal %d recognized\n", sig);
 }
 
-static void phys_wiggle(const struct nos_device *dev, uint32_t cit_gpio,
-			const char *button)
+static void phys_wiggle(uint32_t cit_gpio, const char *button)
 {
     uint32_t prev, curr;
     uint32_t cit_bit;
@@ -685,7 +652,7 @@ static void phys_wiggle(const struct nos_device *dev, uint32_t cit_gpio,
     debug(1, "%s(%d) cit_bit 0x%08x\n", __func__, cit_gpio, cit_bit);
 
     /* read initial value */
-    if (0 != read32(dev, GPIO_DATA, &curr)) {
+    if (0 != read32(GPIO_DATA, &curr)) {
         Error("%s: can't read Citadel GPIOs", __func__);
         return;
     }
@@ -695,7 +662,7 @@ static void phys_wiggle(const struct nos_device *dev, uint32_t cit_gpio,
     printf("\nPlease PRESS the %s button...\n", button);
     do {
         usleep(100 * 1000);
-        if (0 != read32(dev, GPIO_DATA, &curr)) {
+        if (0 != read32(GPIO_DATA, &curr)) {
             Error("%s: can't read Citadel GPIOs", __func__);
             return;
         }
@@ -709,7 +676,7 @@ static void phys_wiggle(const struct nos_device *dev, uint32_t cit_gpio,
     printf("Please RELEASE the %s button...\n", button);
     do {
         usleep(100 * 1000);
-        if (0 != read32(dev, GPIO_DATA, &curr)) {
+        if (0 != read32(GPIO_DATA, &curr)) {
             Error("%s: can't read Citadel GPIOs", __func__);
             return;
         }
@@ -730,13 +697,6 @@ static void do_test(void)
 {
     int rv;
     uint32_t i, buflen, retval, replycount, value;
-    struct nos_device dev;
-
-    printf("\nOpening connection...\n");
-    if (nos_device_open(option.device, &dev) != 0) {
-        Error("Unable to connect to the SPI driver");
-        goto out;
-    }
 
     printf("Simple write...\n");
     /* Clear the version string pointer */
@@ -788,7 +748,7 @@ static void do_test(void)
      */
 
     printf("Read GPIO direction\n");
-    retval = read32(&dev, GPIO_OUTENSET, &value);
+    retval = read32(GPIO_OUTENSET, &value);
     if (retval != 0) {
         Error("Reading GPIO direction failed with 0x%08x", retval);
         goto done;
@@ -810,22 +770,22 @@ static void do_test(void)
      */
 
     if (option.board == BOARD_EVT)
-        ap_wiggle(&dev, "CTDL_AP_IRQ", 7, 129);
+        ap_wiggle("CTDL_AP_IRQ", 7, 129);
     else
-        ap_wiggle(&dev, "CTDL_AP_IRQ", 7, 96);
+        ap_wiggle("CTDL_AP_IRQ", 7, 96);
 
     if (option.board == BOARD_EVT)
-        ap_wiggle(&dev, "AP_CTDL_IRQ", 6, 135);
+        ap_wiggle("AP_CTDL_IRQ", 6, 135);
     else
-        ap_wiggle(&dev, "AP_CTDL_IRQ", 6, 94);
+        ap_wiggle("AP_CTDL_IRQ", 6, 94);
 
-    ap_wiggle(&dev, "AP_SEC_STATE", 4, 76);
-    ap_wiggle(&dev, "AP_PWR_STATE", 5, 69);
+    ap_wiggle("AP_SEC_STATE", 4, 76);
+    ap_wiggle("AP_PWR_STATE", 5, 69);
 
     if (option.board == BOARD_BINDER)
-        ap_wiggle(&dev, "CCD_CABLE_DET", 8, 127);
+        ap_wiggle("CCD_CABLE_DET", 8, 127);
     else
-        ap_wiggle(&dev, "CCD_CABLE_DET", 8, 126);
+        ap_wiggle("CCD_CABLE_DET", 8, 126);
 
     /*
      * Citadel should be able to drive all the physical buttons under
@@ -837,14 +797,14 @@ static void do_test(void)
 
         if (option.board != BOARD_PROTO1)
             /* We had to cut this trace on proto1 (b/66976641) */
-            phys_wiggle(&dev, 0, "Power");
+            phys_wiggle(0, "Power");
 
-        phys_wiggle(&dev, 1, "Volume Down");
-        phys_wiggle(&dev, 2, "Volume Up");
+        phys_wiggle(1, "Volume Down");
+        phys_wiggle(2, "Volume Up");
 
         if (option.board == BOARD_BINDER)
             /* There's only a button on the binder board */
-            phys_wiggle(&dev, 10, "Forced USB Boot");
+            phys_wiggle(10, "Forced USB Boot");
     }
 
     /*
@@ -856,8 +816,6 @@ static void do_test(void)
      */
 
 done:
-    dev.ops.close(dev.ctx);
-out:
     if (errorcnt)
         printf("\nFAIL FAIL FAIL\n\n");
     else
@@ -875,18 +833,28 @@ out:
 #define IGNORED_COMMAND 0x00ffffff
 static void poke_citadel(void)
 {
-    struct nos_device dev;
     int rv;
 
-    if (nos_device_open(option.device, &dev) != 0)
-        return;
-
     rv = dev.ops.write(dev.ctx, IGNORED_COMMAND, 0, 0);
-    dev.ops.close(dev.ctx);
 
     /* If Citadel was asleep, give it some time to wake up */
     if (rv == -EAGAIN)
         usleep(50000);
+}
+
+static int connect_to_citadel(void)
+{
+    int rv = nos_device_open(option.device, &dev);
+
+    if (rv)
+        Error("Unable to connect to Citadel: %s", strerror(-rv));
+
+    return rv;
+}
+
+static void disconnect_from_citadel(void)
+{
+    dev.ops.close(dev.ctx);
 }
 
 int main(int argc, char *argv[])
@@ -964,6 +932,9 @@ int main(int argc, char *argv[])
     if (errorcnt)
         return !!errorcnt;
 
+    if (connect_to_citadel() != 0)
+        return !!errorcnt;
+
     /* Wake Citadel from deep sleep */
     poke_citadel();
 
@@ -988,5 +959,6 @@ int main(int argc, char *argv[])
         do_test();
     }
 
+    disconnect_from_citadel();
     return !!errorcnt;
 }
