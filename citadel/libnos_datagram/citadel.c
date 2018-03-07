@@ -122,14 +122,17 @@ static int write_datagram(void *ctx, uint32_t command, const uint8_t *buf, uint3
     return 0;
 }
 
-static void wait_for_interrupt(void *ctx) {
+static int wait_for_interrupt(void *ctx, int msecs) {
     int fd = *(int *)ctx;
     struct pollfd fds = {fd, POLLIN, 0};
+    int rv;
 
-    // poll() was used because select() doesn't work here for some reason.
-    if (poll(&fds, 1 /*nfds*/, -1) < 0) {
+    rv = poll(&fds, 1 /*nfds*/, msecs);
+    if (rv < 0) {
         ALOGE("poll: %s", strerror(errno));
     }
+
+    return rv;
 }
 
 static int reset(void *ctx) {

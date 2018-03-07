@@ -87,8 +87,11 @@ struct CitadelProxy : public BnCitadeld {
 [[noreturn]] void CitadelEventDispatcher(const nos_device& device) {
     LOG(INFO) << "Event dispatcher startup.";
     while(1) {
-        device.ops.wait_for_interrupt(device.ctx);
-        LOG(INFO) << "Citadel has dispatched an event";
+        if (device.ops.wait_for_interrupt(device.ctx, -1) > 0) {
+            LOG(INFO) << "Citadel has dispatched an event";
+        } else {
+            LOG(INFO) << "Citadel did something unexpected";
+        }
 
         // This is a placeholder for the message handling that gives citadel a
         // chance to deassert CTLD_AP_IRQ, so this doesn't spam the logs.
