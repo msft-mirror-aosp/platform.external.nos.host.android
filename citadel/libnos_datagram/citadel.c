@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#define LOG_TAG "libnos_datagram"
+#include <cutils/log.h>
 #include <nos/device.h>
 
 #include <ctype.h>
@@ -21,7 +23,6 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <linux/types.h>
-#include <log/log.h>
 #include <poll.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -45,12 +46,6 @@ struct citadel_ioc_tpm_datagram {
 /*****************************************************************************/
 
 #define DEV_CITADEL "/dev/citadel0"
-
-static void aperror(const char* msg) {
-  char buffer[80];
-  strerror_r(errno, buffer, sizeof(buffer));
-  ALOGE("%s: %s", msg, buffer);
-}
 
 static uint8_t in_buf[MAX_DEVICE_TRANSFER];
 static int read_datagram(void *ctx, uint32_t command, uint8_t *buf, uint32_t len) {
@@ -81,7 +76,7 @@ static int read_datagram(void *ctx, uint32_t command, uint8_t *buf, uint32_t len
 
     ret = ioctl(fd, CITADEL_IOC_TPM_DATAGRAM, &dg);
     if (ret < 0) {
-        aperror("can't send spi message");
+        ALOGE("can't send spi message: %s", strerror(errno));
         return -errno;
     }
 
@@ -120,7 +115,7 @@ static int write_datagram(void *ctx, uint32_t command, const uint8_t *buf, uint3
 
     ret = ioctl(fd, CITADEL_IOC_TPM_DATAGRAM, &dg);
     if (ret < 0) {
-        aperror("can't send spi message");
+        ALOGE("can't send spi message: %s", strerror(errno));
         return -errno;
     }
 
@@ -133,7 +128,7 @@ static void wait_for_interrupt(void *ctx) {
 
     // poll() was used because select() doesn't work here for some reason.
     if (poll(&fds, 1 /*nfds*/, -1) < 0) {
-        aperror("poll");
+        ALOGE("poll: %s", strerror(errno));
     }
 }
 
@@ -154,7 +149,7 @@ static int reset(void *ctx) {
 
     ret = ioctl(fd, CITADEL_IOC_RESET);
     if (ret < 0) {
-        aperror("can't reset Citadel");
+        ALOGE("can't reset Citadel: %s", strerror(errno));
         return -errno;
     }
     return 0;
@@ -174,7 +169,7 @@ static void close_device(void *ctx) {
     }
 
     if (close(fd) < 0)
-        aperror("Problem closing device (ignored)");
+        ALOGE("Problem closing device (ignored): %s", strerror(errno));
     free(ctx);
 }
 
@@ -183,13 +178,13 @@ int nos_device_open(const char *device_name, struct nos_device *dev) {
 
     fd = open(device_name ? device_name : DEV_CITADEL, O_RDWR);
     if (fd < 0) {
-        aperror("can't open device");
+        ALOGE("can't open device: %s", strerror(errno));
         return -errno;
     }
 
     new_fd = (int *)malloc(sizeof(int));
     if (!new_fd) {
-        aperror("can't malloc new fd");
+        ALOGE("can't malloc new fd: %s", strerror(errno));
         close(fd);
         return -ENOMEM;
     }
