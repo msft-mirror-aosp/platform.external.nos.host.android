@@ -397,12 +397,9 @@ static void do_rw(int argc, char *argv[])
  * working. UART passthrough will have to be tested externally.
  */
 
-/* TPM Register magic commands */
-#define RD4_TPM_DID_VID 0x83d40f00
-#define WR1_TPM_FW_VER  0x00d40f90
-
 /* ARM GPIO config registers */
 #define GPIO_DATA     0x40550000
+#define GPIO_DATAOUT  0x40550004
 #define GPIO_OUTENSET 0x40550010
 
 /* Return true on success */
@@ -537,7 +534,7 @@ static int is_ap_output(uint32_t num)
     if (!strncmp("out", buf, 3))
         return 1;                               /* already an output */
 
-                                                /* Set the direction */
+    /* Set the direction */
     sprintf(buf, "%s", "out");
     if (!write_to_file(filename, buf)) {
         Error("%s: Can't set the direction of gpio %d", __func__, num);
@@ -575,6 +572,7 @@ static int set_ap_value(uint32_t num, int val)
     return 1;
 }
 
+/* This wiggles a GPIO on the AP and checks to make sure Citadel saw it */
 static void ap_wiggle(const char *name, uint32_t cit_gpio, uint32_t ap_gpio)
 {
     uint32_t prev, curr;
@@ -639,6 +637,7 @@ static void sig_handler(int sig)
     printf("Signal %d recognized\n", sig);
 }
 
+/* This prompts the user to push a button and waits for Citadel to see it */
 static void phys_wiggle(uint32_t cit_gpio, const char *button)
 {
     uint32_t prev, curr;
@@ -689,44 +688,93 @@ static void phys_wiggle(uint32_t cit_gpio, const char *button)
     signal(SIGINT, SIG_DFL);
 }
 
-static const uint8_t expected_tpm_did_vid[] = {
-    0xe0, 0x1a, 0x28, 0x00,
-};
+/* How long to wait for an interrupt to trigger (msecs) */
+#define INTERRUPT_TIMEOUT 100
+
+/* Make Citadel wiggle its CTDL_AP_IRQ output, which we should notice */
+static void cit_interrupt(const char *name, uint32_t cit_gpio)
+{
+    uint32_t curr;
+    uint32_t cit_bit;
+    int rv;
+
+    cit_bit = (1 << cit_gpio);
+
+    debug(1, "%s(%s, %d) cit_bit 0x%08x\n", __func__, name, cit_gpio, cit_bit);
+
+    /* First, let's see what Citadel is driving */
+    if (0 != read32(GPIO_DATAOUT, &curr)) {
+        Error("%s: can't read Citadel GPIOs", __func__);
+        return;
+    }
+
+    debug(1, "initial value 0x%08x\n", curr);
+    if (curr & cit_bit) {
+        /* Citadel is already driving it, so we should see it immediately */
+        rv = dev.ops.wait_for_interrupt(dev.ctx, INTERRUPT_TIMEOUT);
+        if (rv > 1) {
+            debug(2, "CTDL_AP_IRQ is already asserted\n");
+        } else {
+            Error("%s: CTDL_AP_IRQ is 1, but wait_for_interrupt() returned %d",
+                  __func__, rv);
+            return;
+        }
+
+        /* Tell Citadel to stop driving it */
+        if (0 != write32(GPIO_DATAOUT, curr & (~cit_bit))) {
+            Error("%s: can't write Citadel GPIOs", __func__);
+            return;
+        }
+
+        /* Make sure it obeyed */
+        if (0 != read32(GPIO_DATAOUT, &curr)) {
+            Error("%s: can't read Citadel GPIOs", __func__);
+            return;
+        }
+        if (curr & cit_bit) {
+            Error("%s: Citadel isn't changing its GPIOs", __func__);
+            return;
+        }
+    }
+
+    debug(1, "there should be no immediate interrupt\n");
+    rv = dev.ops.wait_for_interrupt(dev.ctx, INTERRUPT_TIMEOUT);
+    if (rv == 0) {
+        debug(2, "CTDL_AP_IRQ not asserted and not triggered\n");
+    } else {
+        Error("%s: CTDL_AP_IRQ is 0, but wait_for_interrupt() returned %d",
+              __func__, rv);
+        return;
+    }
+
+    debug(1, "tell Citadel to trigger an interrupt\n");
+    if (0 != write32(GPIO_DATAOUT, curr | cit_bit)) {
+        Error("%s: can't write Citadel GPIOs", __func__);
+        return;
+    }
+
+    rv = dev.ops.wait_for_interrupt(dev.ctx, INTERRUPT_TIMEOUT);
+    if (rv > 0) {
+        debug(2, "CTDL_AP_IRQ is asserted and triggered\n");
+    } else {
+        Error("%s: CTDL_AP_IRQ is 1, but wait_for_interrupt() returned %d",
+              __func__, rv);
+        return;
+    }
+
+    /* Tell Citadel to stop driving it */
+    if (0 != write32(GPIO_DATAOUT, curr & (~cit_bit))) {
+        Error("%s: can't write Citadel GPIOs", __func__);
+        return;
+    }
+}
 
 static void do_test(void)
 {
-    int rv;
-    uint32_t i, buflen, retval, replycount, value;
+    uint32_t retval, replycount, value;
+    int ctdl_ap_irq_is_driven = 0;
 
-    printf("Simple write...\n");
-    /* Clear the version string pointer */
-    buf[0] = 0x00;
-    rv = dev.ops.write(dev.ctx, WR1_TPM_FW_VER, buf, 1);
-    if (rv != 0) {
-        Error("Simple write failed with 0x%08x (%d)", rv, rv);
-        goto done;
-    }
-
-    printf("Simple read...\n");
-    /* Read TPM_DID_VID */
-    buflen = sizeof(expected_tpm_did_vid);
-    memset(buf, 0, buflen);
-    rv = dev.ops.read(dev.ctx, RD4_TPM_DID_VID, buf, buflen);
-    if (rv != 0) {
-        Error("Simple read failed with 0x%08x (%d)", rv, rv);
-        goto done;
-    } else {
-        debug(1, "got:");
-        for (i = 0; i < buflen; i++)
-            debug(1, " %02x", buf[i]);
-        debug(1, "\n");
-
-        if (memcmp(buf, expected_tpm_did_vid, sizeof(expected_tpm_did_vid)))
-            Error("Simple read returned unexpected values");
-        /* Don't quit - others things might still work */
-    }
-
-    /* Transport API */
+    /* Using the Transport API only. Nugget OS doesn't have any Datagram apps. */
     printf("Get version string...\n");
     replycount = sizeof(buf);
     retval = nos_call_application(&dev, APP_ID_NUGGET, NUGGET_PARAM_VERSION,
@@ -737,8 +785,8 @@ static void do_test(void)
         goto done;
     }
     if (replycount < 4 || replycount > 1024)
-        Error("Get version returned %d bytes, which seems wrong",
-              replycount);                      /* might be okay, though */
+        Error("Get version returned %d bytes, which seems wrong", replycount);
+    /* might be okay, though */
     debug_buf(1, buf, replycount);
 
     /*
@@ -753,26 +801,41 @@ static void do_test(void)
         Error("Reading GPIO direction failed with 0x%08x", retval);
         goto done;
     }
-    /* We expect everything to be an input, but keep going regardless */
-    if (value != 0x00000000)
+    switch (value) {
+    case 0x00000000:
+        debug(1, "Citadel's GPIOs are all inputs\n");
+        break;
+    case 0x00000080:
+        debug(1, "Citadel is driving CTDL_AP_IRQ\n");
+        ctdl_ap_irq_is_driven = 1;
+        break;
+    default:
+        /* This is unexpected, but keep going */
         Error("GPIO direction = 0x%08x\n", value);
+    }
 
     /*
      * The MSM GPIOs have moved all around with each revision.
      *
-     *   Net Name           Citadel  Pin         BINDER  PROTO1  EVT
+     *   Net Name           Citadel  Pin         BINDER  B1PROTO1  B1EVT1
      *
-     *   CTDL_AP_IRQ        DIOA5    7           96      96      129
-     *   AP_CTDL_IRQ        DIOA11   6           94      94      135
-     *   AP_SEC_STATE       DIOB7    4           76      76      76
-     *   AP_PWR_STATE       DIOB8    5           69      69      69
-     *   CCD_CABLE_DET      DIOA6    8           127     126     126
+     *   CTDL_AP_IRQ        DIOA5    7           96      96        129
+     *   AP_CTDL_IRQ        DIOA11   6           94      94        135
+     *   AP_SEC_STATE       DIOB7    4           76      76        76
+     *   AP_PWR_STATE       DIOB8    5           69      69        69
+     *   CCD_CABLE_DET      DIOA6    8           127     126       126
      */
 
-    if (option.board == BOARD_EVT)
-        ap_wiggle("CTDL_AP_IRQ", 7, 129);
-    else
-        ap_wiggle("CTDL_AP_IRQ", 7, 96);
+    if (ctdl_ap_irq_is_driven) {
+        /* Citadel should interrupt us */
+        cit_interrupt("CTDL_AP_IRQ", 7);
+    } else {
+        /* We'll wiggle the AP's GPIO and make sure Citadel sees it */
+        if (option.board == BOARD_EVT)
+            ap_wiggle("CTDL_AP_IRQ", 7, 129);
+        else
+            ap_wiggle("CTDL_AP_IRQ", 7, 96);
+    }
 
     if (option.board == BOARD_EVT)
         ap_wiggle("AP_CTDL_IRQ", 6, 135);
