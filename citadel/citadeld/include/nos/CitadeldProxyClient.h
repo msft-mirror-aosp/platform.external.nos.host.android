@@ -26,12 +26,14 @@
 
 namespace nos {
 
+using ::android::hardware::citadel::ICitadeld;
+
 /**
  * Implementation of NuggetClient to proxy calls via the citadeld synchronizing
  * daemon which coordinates communication between the HALs and Citadel.
  */
 class CitadeldProxyClient : public NuggetClientInterface {
-    ::android::sp<::android::hardware::citadel::ICitadeld> _citadeld;
+    ::android::sp<ICitadeld> _citadeld;
 
 public:
     CitadeldProxyClient() = default;
@@ -43,6 +45,8 @@ public:
     uint32_t CallApp(uint32_t appId, uint16_t arg,
                      const std::vector<uint8_t>& request,
                      std::vector<uint8_t>* response) override;
+
+    ICitadeld& Citadeld();
 };
 
 } // namespace nos
