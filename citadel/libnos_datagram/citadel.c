@@ -15,7 +15,7 @@
  */
 
 #define LOG_TAG "libnos_datagram"
-#include <cutils/log.h>
+#include <log/log.h>
 #include <nos/device.h>
 
 #include <ctype.h>
