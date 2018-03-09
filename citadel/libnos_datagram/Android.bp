@@ -19,6 +19,7 @@ cc_library {
     srcs: ["citadel.c"],
     defaults: ["nos_cc_defaults"],
     shared_libs: [
+        "liblog",
         "libnos_datagram",
     ],
 }

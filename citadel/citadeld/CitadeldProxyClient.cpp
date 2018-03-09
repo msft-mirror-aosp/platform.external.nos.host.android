@@ -72,4 +72,8 @@ uint32_t CitadeldProxyClient::CallApp(uint32_t appId, uint16_t arg,
     return APP_ERROR_IO;
 }
 
+ICitadeld& CitadeldProxyClient::Citadeld() {
+    return *_citadeld.get();
+}
+
 } // namespace nos
