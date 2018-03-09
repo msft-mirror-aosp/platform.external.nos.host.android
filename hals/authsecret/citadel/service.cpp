@@ -19,7 +19,6 @@
 #include <utils/StrongPointer.h>
 
 #include <application.h>
-#include <nos/AppClient.h>
 #include <nos/CitadeldProxyClient.h>
 
 #include <AuthSecret.h>
@@ -33,7 +32,6 @@ using ::android::hardware::joinRpcThreadpool;
 using ::android::hardware::authsecret::AuthSecret;
 
 using ::nos::CitadeldProxyClient;
-using ::nos::AppClient;
 
 int main() {
     LOG(INFO) << "AuthSecret HAL service starting";
@@ -50,7 +48,7 @@ int main() {
     configureRpcThreadpool(1, thisThreadWillJoinPool);
 
     // Start the HAL service
-    sp<AuthSecret> authsecret = new AuthSecret;
+    sp<AuthSecret> authsecret = new AuthSecret(citadeldProxy);
     const status_t status = authsecret->registerAsService();
     if (status != OK) {
       LOG(FATAL) << "Failed to register AuthSecret as a service (status: " << status << ")";
