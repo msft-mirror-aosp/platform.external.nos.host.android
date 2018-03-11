@@ -28,6 +28,9 @@ interface ICitadeld {
      */
     int callApp(int appId, int arg, in byte[] request, out byte[] response);
 
+    /** Reset Citadel by pulling the reset line. */
+    boolean reset();
+
     /** Runs a series of checks to ensure the devices is present, connected and responsive. */
     boolean checkDevice();
 }

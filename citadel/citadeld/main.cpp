@@ -15,11 +15,13 @@
  */
 
 #include <limits>
+#include <thread>
 
 #include <android-base/logging.h>
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 
+#include <nos/device.h>
 #include <nos/NuggetClient.h>
 
 #include <android/hardware/citadel/BnCitadeld.h>
@@ -64,6 +66,12 @@ struct CitadelProxy : public BnCitadeld {
         return Status::ok();
     }
 
+    Status reset(bool* const _aidl_return) override {
+        const nos_device& device = *_client.Device();
+        *_aidl_return = (device.ops.reset(device.ctx) == 0);
+        return Status::ok();
+    }
+
     Status checkDevice(bool* const _aidl_return) override {
         LOG(INFO) << "Running citadel device checks...";
         *_aidl_return = android::citadeld::CheckDevice(_client.Device());
@@ -75,6 +83,22 @@ struct CitadelProxy : public BnCitadeld {
         return Status::ok();
     }
 };
+
+[[noreturn]] void CitadelEventDispatcher(const nos_device& device) {
+    LOG(INFO) << "Event dispatcher startup.";
+    while(1) {
+        if (device.ops.wait_for_interrupt(device.ctx, -1) > 0) {
+            LOG(INFO) << "Citadel has dispatched an event";
+        } else {
+            LOG(INFO) << "Citadel did something unexpected";
+        }
+
+        // This is a placeholder for the message handling that gives citadel a
+        // chance to deassert CTLD_AP_IRQ, so this doesn't spam the logs.
+        // TODO(b/62713383) Replace this with the code to contact citadel.
+        sleep(1);
+    }
+}
 
 } // namespace
 
@@ -97,6 +121,10 @@ int main() {
     if (status != OK) {
         LOG(FATAL) << "Failed to register citadeld as a service (status " << status << ")";
     }
+
+    // Handle interrupts triggered by Citadel and dispatch any events to
+    // registered listeners.
+    std::thread event_dispatcher(CitadelEventDispatcher, *citadel.Device());
 
     // The driver only support single threaded access so we only need to process
     // Binder transactions on a single thread.
