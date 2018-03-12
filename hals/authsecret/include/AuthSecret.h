@@ -19,6 +19,8 @@
 
 #include <android/hardware/authsecret/1.0/IAuthSecret.h>
 
+#include <nos/NuggetClientInterface.h>
+
 namespace android {
 namespace hardware {
 namespace authsecret {
@@ -27,11 +29,17 @@ using ::android::hardware::authsecret::V1_0::IAuthSecret;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 
+using ::nos::NuggetClientInterface;
+
 struct AuthSecret : public IAuthSecret {
+    AuthSecret(NuggetClientInterface& client) : _client(client) {}
     ~AuthSecret() override = default;
 
     // Methods from ::android::hardware::authsecret::V1_0::IAuthSecret follow.
     Return<void> primaryUserCredential(const hidl_vec<uint8_t>& secret) override;
+
+private:
+    NuggetClientInterface& _client;
 };
 
 } // namespace authsecret

@@ -15,25 +15,17 @@
 //
 
 cc_binary {
-    name: "test_citadel",
-    srcs: ["test_citadel.c"],
+    name: "citadel_validation_tool",
+    srcs: ["citadel_validation_tool.cpp"],
     defaults: ["nos_cc_hw_defaults"],
     header_libs: [
         "nos_headers",
     ],
-    static_libs: [
-        "libnos_datagram",
-        "libnos_datagram_citadel",
-        "libnos_transport",
-    ],
-    // Not all targets have a static version of liblog for the vendor image
     shared_libs: [
-        "liblog",
+        "libbase",
+        "libbinder",
+        "libnos",
+        "libnos_citadeld_proxy",
+        "libutils",
     ],
-}
-
-cc_binary {
-    name: "stupid",
-    srcs: ["stupid.c"],
-    defaults: ["nos_cc_hw_defaults"],
 }
