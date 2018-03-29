@@ -44,7 +44,6 @@ cc_binary {
     init_rc: ["citadeld.rc"],
     srcs: [
         "main.cpp",
-        "check.cpp",
     ],
     defaults: ["citadeld_hw_defaults"],
     shared_libs: [
@@ -52,12 +51,6 @@ cc_binary {
         "libnos_client_citadel",
         "libnos_transport",
     ],
-}
-
-cc_binary {
-    name: "citadel_test",
-    srcs: ["citadel_test.cpp"],
-    defaults: ["citadeld_hw_defaults"],
 }
 
 cc_library {
