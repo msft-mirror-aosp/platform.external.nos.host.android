@@ -30,7 +30,4 @@ interface ICitadeld {
 
     /** Reset Citadel by pulling the reset line. */
     boolean reset();
-
-    /** Runs a series of checks to ensure the devices is present, connected and responsive. */
-    boolean checkDevice();
 }

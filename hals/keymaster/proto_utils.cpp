@@ -977,6 +977,10 @@ ErrorCode translate_error_code(nosapp::ErrorCode error_code)
         return ErrorCode::CONCURRENT_PROOF_OF_PRESENCE_REQUESTED;
     case nosapp::ErrorCode::UNKNOWN_ERROR:
         return ErrorCode::UNKNOWN_ERROR;
+
+    /* Private error codes, unused by HAL. */
+    case nosapp::ErrorCode::INVALID_DEVICE_IDS:
+    case nosapp::ErrorCode::PRODUCTION_MODE_PROVISIONING:
     case nosapp::ErrorCode::ErrorCode_INT_MIN_SENTINEL_DO_NOT_USE_:
     case nosapp::ErrorCode::ErrorCode_INT_MAX_SENTINEL_DO_NOT_USE_:
         LOG(ERROR) << "Unrecognized error_code: " << error_code;

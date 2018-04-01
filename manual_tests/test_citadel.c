@@ -895,7 +895,7 @@ done:
  * We don't bother tracking or reporting errors. The test will report any real
  * errors.
  */
-#define IGNORED_COMMAND 0x00ffffff
+#define IGNORED_COMMAND (CMD_ID(APP_ID_TEST) | CMD_PARAM(0xffff))
 static void poke_citadel(void)
 {
     int rv;
