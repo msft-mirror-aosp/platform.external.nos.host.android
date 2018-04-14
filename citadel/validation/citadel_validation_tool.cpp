@@ -51,6 +51,12 @@ std::string ToHexString(uint32_t value) {
     return ss.str();
 }
 
+std::string ToDecString(uint32_t value) {
+    std::stringstream ss;
+    ss << std::dec << value;
+    return ss.str();
+}
+
 /* Read a value from a Citadel register */
 bool ReadRegister(NuggetClientInterface& client, uint32_t address, uint32_t* value) {
     // Build request
@@ -196,6 +202,9 @@ int CmdStressSpi(NuggetClientInterface& client, char** params) {
         }
     }
 
+    // If we got here, we know that the test passed
+    std::cout << "stress-spi passed!\n";
+
     return EXIT_SUCCESS;
 }
 
@@ -249,6 +258,11 @@ int CmdHealthCheck(NuggetClientInterface& client) {
         ret = EXIT_FAILURE;
     }
 
+    if (ret == EXIT_SUCCESS) {
+        // If we got here, we know that the test passed
+        std::cout << "health-check passed!\n";
+    }
+
     return ret;
 }
 
@@ -269,6 +283,7 @@ int CmdReset(CitadeldProxyClient& client) {
     // 5% margin.
     uint32_t cycles;
     if (!CyclesSinceBoot(client, &cycles)) {
+        std::cerr << "Citadel did not boot! No indication of cycles since boot\n";
         return EXIT_FAILURE;
     }
     const auto uptime = std::chrono::microseconds(cycles);
@@ -277,10 +292,191 @@ int CmdReset(CitadeldProxyClient& client) {
     if (uptime > limit) {
         LOG(ERROR) << "Uptime is " << uptime.count()
                    << "us but is expected to be less than " << limit.count() << "us\n";
+        std::cerr << "Citadel appears to have not reset, cycles since boot is too high\n";
         return EXIT_FAILURE;
     }
 
+    std::cout << "Citadel booted successully after reset\n";
     return EXIT_SUCCESS;
+}
+
+/**
+ * Enable battery monitors, TRNG stats, TRNG camo blocks for coex testing
+ */
+int CmdEnableAlerts(CitadeldProxyClient& client) {
+
+    constexpr uint32_t TRNG_MONITOR_STATS = 0x40410010;
+    // Enable NIST monobit statistical check
+    if (!WriteRegister(client, TRNG_MONITOR_STATS, 0x3)) {
+        std::cerr << "Failed to write to TRNG_MONITOR_STATS\n";
+        return EXIT_FAILURE;
+    }
+
+    constexpr uint32_t TRNG_CAMO_EN = 0x40410068;
+    // Turn on active camo shield over TRNG analog core
+    if (!WriteRegister(client, TRNG_CAMO_EN, 0x1)) {
+        std::cerr << "Failed to write to TRNG_CAMO_EN\n";
+        return EXIT_FAILURE;
+    }
+
+    constexpr uint32_t PMU_SW_PDB_SECURE = 0x4000002c;
+    // Turn on battery monitors: VDDIOM, VDDAON and VDDL
+    if (!WriteRegister(client, PMU_SW_PDB_SECURE, 0x15)) {
+        std::cerr << "Failed to write to PMU_SW_PDB_SECURE\n";
+        return EXIT_FAILURE;
+    }
+
+    // Wait for battery monitors to settle
+    usleep(1000);
+
+    // Turn on battery monitor alerts: VDDIOM, VDDAON and VDDL
+    if (!WriteRegister(client, PMU_SW_PDB_SECURE, 0x3f)) {
+        std::cerr << "Failed to write to PMU_SW_PDB_SECURE\n";
+        return EXIT_FAILURE;
+    }
+
+    std::cout << "Analog alerts enabled\n";
+
+    return EXIT_SUCCESS;
+
+}
+
+int CmdDisableAlerts(CitadeldProxyClient& client) {
+
+    constexpr uint32_t TRNG_MONITOR_STATS = 0x40410010;
+    // Disable NIST monobit statistical check
+    if (!WriteRegister(client, TRNG_MONITOR_STATS, 0x1)) {
+        std::cerr << "Failed to write to TRNG_MONITOR_STATS\n";
+        return EXIT_FAILURE;
+    }
+
+    constexpr uint32_t TRNG_CAMO_EN = 0x40410068;
+    // Turn off active camo shield over TRNG analog core
+    if (!WriteRegister(client, TRNG_CAMO_EN, 0x0)) {
+        std::cerr << "Failed to write to TRNG_CAMO_EN\n";
+        return EXIT_FAILURE;
+    }
+
+    constexpr uint32_t PMU_SW_PDB_SECURE = 0x4000002c;
+    // Turn off battery monitors: VDDIOM, VDDAON and VDDL
+    if (!WriteRegister(client, PMU_SW_PDB_SECURE, 0x0)) {
+        std::cerr << "Failed to write to PMU_SW_PDB_SECURE\n";
+        return EXIT_FAILURE;
+    }
+
+    std::cout << "Analog alerts disabled\n";
+
+    return EXIT_SUCCESS;
+
+}
+
+/* Turn on Citadel's temperature sensor and read value */
+int CmdGetTemp(CitadeldProxyClient& client) {
+
+    constexpr uint32_t TEMP_ADC_OPERATION = 0x40400028;
+    // Disable temperature sensor
+    if (!WriteRegister(client, TEMP_ADC_OPERATION, 0x0)) {
+        std::cerr << "Failed to write to TEMP_ADC_OPERATION\n";
+        return EXIT_FAILURE;
+    }
+
+    constexpr uint32_t TEMP_ADC_POWER_DOWN_B = 0x40400024;
+    // Disable temperature sensor analog core
+    if (!WriteRegister(client, TEMP_ADC_POWER_DOWN_B, 0x0)) {
+        std::cerr << "Failed to write to TEMP_ADC_POWER_DOWN_B\n";
+        return EXIT_FAILURE;
+    }
+
+    constexpr uint32_t TEMP_ADC_CLKDIV2_ENABLE = 0x4040001c;
+    // Divide clock into temperature sensor
+    if (!WriteRegister(client, TEMP_ADC_CLKDIV2_ENABLE, 0x1)) {
+        std::cerr << "Failed to write to TEMP_ADC_CLKDIV2_ENABLE\n";
+        return EXIT_FAILURE;
+    }
+
+    constexpr uint32_t TEMP_ADC_ANALOG_CTRL = 0x40400014;
+    // Configure temperature sensor analog controls
+    if (!WriteRegister(client, TEMP_ADC_ANALOG_CTRL, 0x33)) {
+        std::cerr << "Failed to write to TEMP_ADC_ANALOG_CTRL\n";
+        return EXIT_FAILURE;
+    }
+
+    constexpr uint32_t TEMP_ADC_FSM_CTRL = 0x40400018;
+    // Configure temperature sensor FSM
+    if (!WriteRegister(client, TEMP_ADC_FSM_CTRL, 0x3986e)) {
+        std::cerr << "Failed to write to TEMP_ADC_FSM_CTRL\n";
+        return EXIT_FAILURE;
+    }
+
+    // Enable temperature sensor analog core
+    if (!WriteRegister(client, TEMP_ADC_POWER_DOWN_B, 0x1)) {
+        std::cerr << "Failed to write to TEMP_ADC_POWER_DOWN_B\n";
+        return EXIT_FAILURE;
+    }
+
+    // Enable temperature sensor
+    if (!WriteRegister(client, TEMP_ADC_OPERATION, 0x1)) {
+        std::cerr << "Failed to write to TEMP_ADC_OPERATION\n";
+        return EXIT_FAILURE;
+    }
+    if (!WriteRegister(client, TEMP_ADC_OPERATION, 0x3)) {
+        std::cerr << "Failed to write to TEMP_ADC_OPERATION\n";
+        return EXIT_FAILURE;
+    }
+
+    /* temperature sensor is on, now get an actual averaged
+       reading */
+
+    constexpr uint32_t TEMP_ADC_ONESHOT_ACQ = 0x40400020;
+    constexpr uint32_t TEMP_ADC_SUM8 = 0x40400038;
+    uint32_t current_temp;
+    // Configure temperature sensor FSM
+    if (!WriteRegister(client, TEMP_ADC_ONESHOT_ACQ, 0x0)) {
+        std::cerr << "Failed to write to TEMP_ADC_ONESHOT_ACQ\n";
+        return EXIT_FAILURE;
+    }
+
+    for (uint32_t i = 0; i < 16; ++i) {
+        // trigger acquisition
+        if (!WriteRegister(client, TEMP_ADC_ONESHOT_ACQ, 0x0)) {
+            std::cerr << "Failed to write to TEMP_ADC_ONESHOT_ACQ\n";
+            return EXIT_FAILURE;
+        }
+        if (!WriteRegister(client, TEMP_ADC_ONESHOT_ACQ, 0x1)) {
+            std::cerr << "Failed to write to TEMP_ADC_ONESHOT_ACQ\n";
+            return EXIT_FAILURE;
+        }
+
+        // wait for acquisition
+        usleep(50000);
+
+        // grab value
+        if (!ReadRegister(client, TEMP_ADC_SUM8, &current_temp)) {
+            std::cerr << "Failed to read TEMP_ADC_SUM8\n";
+            return EXIT_FAILURE;
+        }
+        //std::cout << "Current tempval = " << ToHexString(current_temp) << "\n";
+    }
+
+    std::cout << "Current tempval = " << ToHexString(current_temp) << "\n";
+
+    constexpr uint32_t FUSE_TEMP_OFFSET_CAL = 0x404800b4;
+    uint32_t temp_offset, slope, temp_degc;
+    // Configure temperature sensor FSM
+    if (!ReadRegister(client, FUSE_TEMP_OFFSET_CAL, &temp_offset)) {
+        std::cerr << "Failed to read FUSE_TEMP_OFFSET_CAL\n";
+        return EXIT_FAILURE;
+    }
+
+    // Now convert to degC
+    temp_offset = temp_offset & 0xfff; //only 12b value
+    slope = (875<<3)/1000; // TEMP_ADC_SUM8 is 9.3b fixed point
+    temp_degc = (((current_temp - temp_offset) << 3)/slope) >> 3; // just grab integer value
+
+    std::cout << "Current temperature = " << ToDecString(temp_degc) << "C\n";
+
+    return EXIT_SUCCESS;
+
 }
 
 } // namespace
@@ -310,6 +506,15 @@ int main(int argc, char** argv) {
         if (command == "reset" && param_count == 0) {
             return CmdReset(citadeldProxy);
         }
+        if (command == "enable-alerts" && param_count == 0) {
+            return CmdEnableAlerts(citadeldProxy);
+        }
+        if (command == "disable-alerts" && param_count == 0) {
+            return CmdDisableAlerts(citadeldProxy);
+        }
+        if (command == "get-temp" && param_count == 0) {
+            return CmdGetTemp(citadeldProxy);
+        }
     }
 
     // Print usage if all else failed
@@ -317,6 +522,9 @@ int main(int argc, char** argv) {
     std::cerr << "  " << argv[0] << " stress-spi [count] -- perform count SPI transactions\n";
     std::cerr << "  " << argv[0] << " health-check       -- check Citadel's vital signs\n";
     std::cerr << "  " << argv[0] << " reset              -- pull Citadel's reset line\n";
+    std::cerr << "  " << argv[0] << " enable-alerts      -- enable analog alert blocks\n";
+    std::cerr << "  " << argv[0] << " disable-alerts     -- disable analog alert blocks\n";
+    std::cerr << "  " << argv[0] << " get-temp           -- get temperature from temp sensor\n";
     std::cerr << "\n";
     std::cerr << "Returns 0 on success and non-0 if any failure were detected.\n";
     return EXIT_FAILURE;
