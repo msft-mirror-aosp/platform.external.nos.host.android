@@ -78,9 +78,14 @@ using ::nugget::app::keymaster::FinishOperationRequest;
 using ::nugget::app::keymaster::FinishOperationResponse;
 using ::nugget::app::keymaster::AbortOperationRequest;
 using ::nugget::app::keymaster::AbortOperationResponse;
+using ::nugget::app::keymaster::ComputeSharedHmacRequest;
+using ::nugget::app::keymaster::ComputeSharedHmacResponse;
+using ::nugget::app::keymaster::GetHmacSharingParametersRequest;
+using ::nugget::app::keymaster::GetHmacSharingParametersResponse;
 
 // KM 4.0 types
 using ::nugget::app::keymaster::ImportWrappedKeyRequest;
+namespace nosapp = ::nugget::app::keymaster;
 
 static ErrorCode status_to_error_code(uint32_t status)
 {
@@ -158,8 +163,42 @@ Return<void> KeymasterDevice::getHmacSharingParameters(
 {
     LOG(VERBOSE) << "Running KeymasterDevice::getHmacSharingParameters";
 
-    (void)_keymaster;
-    _hidl_cb(ErrorCode::UNIMPLEMENTED, HmacSharingParameters());
+    GetHmacSharingParametersRequest request;
+    GetHmacSharingParametersResponse response;
+    HmacSharingParameters result;
+
+    KM_CALLV(GetHmacSharingParameters, result);
+
+    ErrorCode ec = translate_error_code(response.error_code());
+
+    if (ec != ErrorCode::OK) {
+        _hidl_cb(ec, HmacSharingParameters());
+    }
+
+    const std::string & nonce = response.hmac_sharing_params().nonce();
+    const std::string & seed = response.hmac_sharing_params().seed();
+
+    if (seed.size() == 32) {
+        result.seed.setToExternal(reinterpret_cast<uint8_t*>(
+                const_cast<char*>(seed.data())),
+                seed.size(), false);
+    } else if (seed.size() != 0) {
+        LOG(ERROR) << "Citadel returned unexpected seed size: "
+                << seed.size();
+        _hidl_cb(ErrorCode::UNKNOWN_ERROR, HmacSharingParameters());
+        return Void();
+    }
+
+    if (nonce.size() == result.nonce.size()) {
+        std::copy(nonce.begin(), nonce.end(), result.nonce.data());
+    } else {
+        LOG(ERROR) << "Citadel returned unexpected nonce size: "
+                << nonce.size();
+        _hidl_cb(ErrorCode::UNKNOWN_ERROR, HmacSharingParameters());
+        return Void();
+    }
+
+    _hidl_cb(ec, result);
 
     return Void();
 }
@@ -168,12 +207,38 @@ Return<void> KeymasterDevice::computeSharedHmac(
     const hidl_vec<HmacSharingParameters>& params,
     computeSharedHmac_cb _hidl_cb)
 {
-     LOG(VERBOSE) << "Running KeymasterDevice::computeSharedHmac";
+    LOG(VERBOSE) << "Running KeymasterDevice::computeSharedHmac";
 
-    (void)params;
+    ComputeSharedHmacRequest request;
+    ComputeSharedHmacResponse response;
+    hidl_vec<uint8_t> result;
 
-    (void)_keymaster;
-    _hidl_cb(ErrorCode::UNIMPLEMENTED, hidl_vec<uint8_t>{});
+    for (const HmacSharingParameters & param : params) {
+        // TODO respect max number of parameters defined in
+        // keymaster_types.proto
+        nosapp::HmacSharingParameters* req_param =
+                request.add_hmac_sharing_params();
+        req_param->set_nonce(
+                reinterpret_cast<const int8_t*>(
+                param.nonce.data()), param.nonce.size());
+        req_param->set_seed(reinterpret_cast<const int8_t*>(param.seed.data()),
+                param.seed.size());
+    }
+
+    KM_CALLV(ComputeSharedHmac, result);
+
+    ErrorCode ec = translate_error_code(response.error_code());
+
+    if (ec != ErrorCode::OK) {
+        _hidl_cb(ec, result);
+        return Void();
+    }
+
+    const std::string & share_check = response.sharing_check();
+
+    result.setToExternal(reinterpret_cast<uint8_t*>(
+            const_cast<char*>(share_check.data())), share_check.size(), false);
+    _hidl_cb(ec, result);
 
     return Void();
 }
