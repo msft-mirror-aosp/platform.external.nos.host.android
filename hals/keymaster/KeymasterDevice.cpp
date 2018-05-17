@@ -42,6 +42,8 @@ using ::android::hardware::Void;
 using ::android::hardware::keymaster::V4_0::Algorithm;
 using ::android::hardware::keymaster::V4_0::KeyCharacteristics;
 using ::android::hardware::keymaster::V4_0::KeyFormat;
+using ::android::hardware::keymaster::V4_0::HardwareAuthToken;
+using ::android::hardware::keymaster::V4_0::HardwareAuthenticatorType;
 using ::android::hardware::keymaster::V4_0::SecurityLevel;
 using ::android::hardware::keymaster::V4_0::Tag;
 
@@ -244,12 +246,12 @@ Return<void> KeymasterDevice::computeSharedHmac(
 }
 
 Return<void> KeymasterDevice::verifyAuthorization(
-    uint64_t challenge, const hidl_vec<KeyParameter>& parametersToVerify,
+    uint64_t operationHandle, const hidl_vec<KeyParameter>& parametersToVerify,
     const HardwareAuthToken& authToken, verifyAuthorization_cb _hidl_cb)
 {
     LOG(VERBOSE) << "Running KeymasterDevice::verifyAuthorization";
 
-    (void)challenge;
+    (void)operationHandle;
     (void)parametersToVerify;
     (void)authToken;
 
@@ -530,10 +532,14 @@ Return<void> KeymasterDevice::begin(
 
     request.set_purpose((::nugget::app::keymaster::KeyPurpose)purpose);
     request.mutable_blob()->set_blob(&key[0], key.size());
-    // TODO: set request.auth_token().
-    (void)authToken;
 
     hidl_vec<KeyParameter> params;
+    if (translate_auth_token(
+            authToken, request.mutable_auth_token()) != ErrorCode::OK) {
+        _hidl_cb(ErrorCode::INVALID_ARGUMENT, params,
+                 response.handle().handle());
+        return Void();
+    }
     if (hidl_params_to_pb(
             inParams, request.mutable_params()) != ErrorCode::OK) {
       _hidl_cb(ErrorCode::INVALID_ARGUMENT, params,
@@ -586,9 +592,13 @@ Return<void> KeymasterDevice::update(
     }
 
     request.set_input(&input[0], input.size());
-    // TODO: add authToken and verificationToken.
-    (void)authToken;
-    (void)verificationToken;
+    if (translate_auth_token(
+            authToken, request.mutable_auth_token()) != ErrorCode::OK) {
+        _hidl_cb(ErrorCode::INVALID_ARGUMENT, 0, params, output);
+        return Void();
+    }
+    translate_verification_token(verificationToken,
+                                 request.mutable_verification_token());
 
     KM_CALLV(UpdateOperation, 0, hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
 
@@ -640,9 +650,13 @@ Return<void> KeymasterDevice::finish(
     request.set_input(&input[0], input.size());
     request.set_signature(&signature[0], signature.size());
 
-    // TODO: add authToken and verificationToken.
-    (void)authToken;
-    (void)verificationToken;
+    if (translate_auth_token(
+            authToken, request.mutable_auth_token()) != ErrorCode::OK) {
+        _hidl_cb(ErrorCode::INVALID_ARGUMENT, params, output);
+        return Void();
+    }
+    translate_verification_token(verificationToken,
+                                 request.mutable_verification_token());
 
     KM_CALLV(FinishOperation, hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
 
