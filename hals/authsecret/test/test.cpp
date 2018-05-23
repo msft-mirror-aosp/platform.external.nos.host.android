@@ -156,7 +156,7 @@ TEST(AuthSecretHalTest, updateRwAndRoTogether) {
                                 WhichHeaderEq(NUGGET_ENABLE_HEADER_RW | NUGGET_ENABLE_HEADER_RO),
                                 _)).WillOnce(Return(APP_SUCCESS));
     EXPECT_CALL(client, CallApp(APP_ID_NUGGET, NUGGET_PARAM_REBOOT,
-                                _, _)).WillOnce(Return(APP_SUCCESS));
+                                ElementsAre(NUGGET_REBOOT_HARD), _)).WillOnce(Return(APP_SUCCESS));
 
     hidl_vec<uint8_t> secret(47);
     hal.primaryUserCredential(secret);
