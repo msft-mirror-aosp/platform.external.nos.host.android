@@ -445,53 +445,6 @@ static ErrorCode translate_key_origin(nosapp::KeyOrigin key_origin,
     return ErrorCode::OK;
 }
 
-ErrorCode translate_auth_token(const HardwareAuthToken& auth_token,
-                               nosapp::HardwareAuthToken *out)
-{
-    out->set_challenge(auth_token.challenge);
-    out->set_user_id(auth_token.userId);
-    out->set_authenticator_id(auth_token.authenticatorId);
-
-    switch (auth_token.authenticatorType) {
-    case HardwareAuthenticatorType::NONE:
-        out->set_authenticator_type(
-            nosapp::HardwareAuthenticatorType::AUTH_NONE);
-        break;
-    case HardwareAuthenticatorType::PASSWORD:
-        out->set_authenticator_type(
-            nosapp::HardwareAuthenticatorType::AUTH_PASSWORD);
-        break;
-    case HardwareAuthenticatorType::FINGERPRINT:
-        out->set_authenticator_type(
-            nosapp::HardwareAuthenticatorType::AUTH_FINGERPRINT);
-        break;
-    case HardwareAuthenticatorType::ANY:
-        out->set_authenticator_type(
-            nosapp::HardwareAuthenticatorType::AUTH_ANY);
-        break;
-    default:
-        return ErrorCode::UNKNOWN_ERROR;
-    }
-
-    out->set_timestamp(auth_token.timestamp);
-    out->set_mac(&auth_token.mac[0], auth_token.mac.size());
-
-    return ErrorCode::OK;
-}
-
-void translate_verification_token(
-    const VerificationToken& verification_token,
-    nosapp::VerificationToken *out)
-{
-    out->set_challenge(verification_token.challenge);
-    out->set_timestamp(verification_token.timestamp);
-    hidl_params_to_pb(verification_token.parametersVerified,
-                      out->mutable_params_verified());
-    out->set_security_level(nosapp::SecurityLevel::STRONGBOX);
-    out->set_mac(verification_token.mac.data(),
-                 verification_token.mac.size());
-}
-
 ErrorCode key_parameter_to_pb(const KeyParameter& param,
                               nosapp::KeyParameter *pb)
 {
