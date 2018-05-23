@@ -42,8 +42,6 @@ using ::android::hardware::Void;
 using ::android::hardware::keymaster::V4_0::Algorithm;
 using ::android::hardware::keymaster::V4_0::KeyCharacteristics;
 using ::android::hardware::keymaster::V4_0::KeyFormat;
-using ::android::hardware::keymaster::V4_0::HardwareAuthToken;
-using ::android::hardware::keymaster::V4_0::HardwareAuthenticatorType;
 using ::android::hardware::keymaster::V4_0::SecurityLevel;
 using ::android::hardware::keymaster::V4_0::Tag;
 
@@ -80,14 +78,9 @@ using ::nugget::app::keymaster::FinishOperationRequest;
 using ::nugget::app::keymaster::FinishOperationResponse;
 using ::nugget::app::keymaster::AbortOperationRequest;
 using ::nugget::app::keymaster::AbortOperationResponse;
-using ::nugget::app::keymaster::ComputeSharedHmacRequest;
-using ::nugget::app::keymaster::ComputeSharedHmacResponse;
-using ::nugget::app::keymaster::GetHmacSharingParametersRequest;
-using ::nugget::app::keymaster::GetHmacSharingParametersResponse;
 
 // KM 4.0 types
 using ::nugget::app::keymaster::ImportWrappedKeyRequest;
-namespace nosapp = ::nugget::app::keymaster;
 
 static ErrorCode status_to_error_code(uint32_t status)
 {
@@ -165,42 +158,8 @@ Return<void> KeymasterDevice::getHmacSharingParameters(
 {
     LOG(VERBOSE) << "Running KeymasterDevice::getHmacSharingParameters";
 
-    GetHmacSharingParametersRequest request;
-    GetHmacSharingParametersResponse response;
-    HmacSharingParameters result;
-
-    KM_CALLV(GetHmacSharingParameters, result);
-
-    ErrorCode ec = translate_error_code(response.error_code());
-
-    if (ec != ErrorCode::OK) {
-        _hidl_cb(ec, HmacSharingParameters());
-    }
-
-    const std::string & nonce = response.hmac_sharing_params().nonce();
-    const std::string & seed = response.hmac_sharing_params().seed();
-
-    if (seed.size() == 32) {
-        result.seed.setToExternal(reinterpret_cast<uint8_t*>(
-                const_cast<char*>(seed.data())),
-                seed.size(), false);
-    } else if (seed.size() != 0) {
-        LOG(ERROR) << "Citadel returned unexpected seed size: "
-                << seed.size();
-        _hidl_cb(ErrorCode::UNKNOWN_ERROR, HmacSharingParameters());
-        return Void();
-    }
-
-    if (nonce.size() == result.nonce.size()) {
-        std::copy(nonce.begin(), nonce.end(), result.nonce.data());
-    } else {
-        LOG(ERROR) << "Citadel returned unexpected nonce size: "
-                << nonce.size();
-        _hidl_cb(ErrorCode::UNKNOWN_ERROR, HmacSharingParameters());
-        return Void();
-    }
-
-    _hidl_cb(ec, result);
+    (void)_keymaster;
+    _hidl_cb(ErrorCode::UNIMPLEMENTED, HmacSharingParameters());
 
     return Void();
 }
@@ -209,49 +168,23 @@ Return<void> KeymasterDevice::computeSharedHmac(
     const hidl_vec<HmacSharingParameters>& params,
     computeSharedHmac_cb _hidl_cb)
 {
-    LOG(VERBOSE) << "Running KeymasterDevice::computeSharedHmac";
+     LOG(VERBOSE) << "Running KeymasterDevice::computeSharedHmac";
 
-    ComputeSharedHmacRequest request;
-    ComputeSharedHmacResponse response;
-    hidl_vec<uint8_t> result;
+    (void)params;
 
-    for (const HmacSharingParameters & param : params) {
-        // TODO respect max number of parameters defined in
-        // keymaster_types.proto
-        nosapp::HmacSharingParameters* req_param =
-                request.add_hmac_sharing_params();
-        req_param->set_nonce(
-                reinterpret_cast<const int8_t*>(
-                param.nonce.data()), param.nonce.size());
-        req_param->set_seed(reinterpret_cast<const int8_t*>(param.seed.data()),
-                param.seed.size());
-    }
-
-    KM_CALLV(ComputeSharedHmac, result);
-
-    ErrorCode ec = translate_error_code(response.error_code());
-
-    if (ec != ErrorCode::OK) {
-        _hidl_cb(ec, result);
-        return Void();
-    }
-
-    const std::string & share_check = response.sharing_check();
-
-    result.setToExternal(reinterpret_cast<uint8_t*>(
-            const_cast<char*>(share_check.data())), share_check.size(), false);
-    _hidl_cb(ec, result);
+    (void)_keymaster;
+    _hidl_cb(ErrorCode::UNIMPLEMENTED, hidl_vec<uint8_t>{});
 
     return Void();
 }
 
 Return<void> KeymasterDevice::verifyAuthorization(
-    uint64_t operationHandle, const hidl_vec<KeyParameter>& parametersToVerify,
+    uint64_t challenge, const hidl_vec<KeyParameter>& parametersToVerify,
     const HardwareAuthToken& authToken, verifyAuthorization_cb _hidl_cb)
 {
     LOG(VERBOSE) << "Running KeymasterDevice::verifyAuthorization";
 
-    (void)operationHandle;
+    (void)challenge;
     (void)parametersToVerify;
     (void)authToken;
 
@@ -532,14 +465,10 @@ Return<void> KeymasterDevice::begin(
 
     request.set_purpose((::nugget::app::keymaster::KeyPurpose)purpose);
     request.mutable_blob()->set_blob(&key[0], key.size());
+    // TODO: set request.auth_token().
+    (void)authToken;
 
     hidl_vec<KeyParameter> params;
-    if (translate_auth_token(
-            authToken, request.mutable_auth_token()) != ErrorCode::OK) {
-        _hidl_cb(ErrorCode::INVALID_ARGUMENT, params,
-                 response.handle().handle());
-        return Void();
-    }
     if (hidl_params_to_pb(
             inParams, request.mutable_params()) != ErrorCode::OK) {
       _hidl_cb(ErrorCode::INVALID_ARGUMENT, params,
@@ -592,13 +521,9 @@ Return<void> KeymasterDevice::update(
     }
 
     request.set_input(&input[0], input.size());
-    if (translate_auth_token(
-            authToken, request.mutable_auth_token()) != ErrorCode::OK) {
-        _hidl_cb(ErrorCode::INVALID_ARGUMENT, 0, params, output);
-        return Void();
-    }
-    translate_verification_token(verificationToken,
-                                 request.mutable_verification_token());
+    // TODO: add authToken and verificationToken.
+    (void)authToken;
+    (void)verificationToken;
 
     KM_CALLV(UpdateOperation, 0, hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
 
@@ -650,13 +575,9 @@ Return<void> KeymasterDevice::finish(
     request.set_input(&input[0], input.size());
     request.set_signature(&signature[0], signature.size());
 
-    if (translate_auth_token(
-            authToken, request.mutable_auth_token()) != ErrorCode::OK) {
-        _hidl_cb(ErrorCode::INVALID_ARGUMENT, params, output);
-        return Void();
-    }
-    translate_verification_token(verificationToken,
-                                 request.mutable_verification_token());
+    // TODO: add authToken and verificationToken.
+    (void)authToken;
+    (void)verificationToken;
 
     KM_CALLV(FinishOperation, hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
 
