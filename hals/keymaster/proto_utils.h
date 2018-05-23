@@ -31,11 +31,8 @@ namespace keymaster {
 // HAL
 using ::android::hardware::keymaster::V4_0::EcCurve;
 using ::android::hardware::keymaster::V4_0::ErrorCode;
-using ::android::hardware::keymaster::V4_0::HardwareAuthToken;
 using ::android::hardware::keymaster::V4_0::KeyParameter;
-using ::android::hardware::keymaster::V4_0::SecurityLevel;
 using ::android::hardware::keymaster::V4_0::Tag;
-using ::android::hardware::keymaster::V4_0::VerificationToken;
 using ::android::hardware::hidl_vec;
 
 // std
@@ -59,11 +56,6 @@ ErrorCode pb_to_hidl_params(const nosapp::KeyParameters& pbParams,
                             hidl_vec<KeyParameter> *params);
 ErrorCode translate_error_code(nosapp::ErrorCode error_code);
 ErrorCode translate_ec_curve(nosapp::EcCurve ec_curve, EcCurve *out);
-ErrorCode translate_auth_token(const HardwareAuthToken& auth_token,
-                          nosapp::HardwareAuthToken *out);
-void translate_verification_token(
-    const VerificationToken& verification_token,
-    nosapp::VerificationToken *out);
 
 }  // namespace keymaster
 }  // hardware
