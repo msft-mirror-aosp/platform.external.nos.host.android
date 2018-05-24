@@ -41,7 +41,7 @@ using ::android::hardware::hidl_vec;
 using KeymasterClient = ::nugget::app::keymaster::IKeymaster;
 
 struct KeymasterDevice : public IKeymasterDevice {
-    KeymasterDevice(KeymasterClient& keymaster) : _keymaster{keymaster} {}
+    KeymasterDevice(KeymasterClient& keymaster);
     ~KeymasterDevice() override = default;
 
     // Methods from ::android::hardware::keymaster::V4_0::IKeymasterDevice follow.
@@ -105,6 +105,9 @@ struct KeymasterDevice : public IKeymasterDevice {
 
 private:
     KeymasterClient& _keymaster;
+    uint32_t os_version;
+    uint32_t os_patchlevel;
+    uint32_t vendor_patchlevel;
 };
 
 }  // namespace keymaster

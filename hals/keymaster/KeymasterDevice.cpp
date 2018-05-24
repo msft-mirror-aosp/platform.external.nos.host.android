@@ -27,13 +27,59 @@
 #include <keymasterV4_0/key_param_output.h>
 
 #include <android-base/logging.h>
+#include <android-base/properties.h>
+
+#include <algorithm>
 
 namespace android {
 namespace hardware {
 namespace keymaster {
 
+namespace {
+
+constexpr char PROPERTY_OS_VERSION[] = "ro.build.version.release";
+constexpr char PROPERTY_OS_PATCHLEVEL[] = "ro.build.version.security_patch";
+constexpr char PROPERTY_VENDOR_PATCHLEVEL[] = "ro.vendor.build.security_patch";
+
+std::string DigitsOnly(const std::string& code) {
+	// Keep digits only.
+	std::string filtered_code;
+	filtered_code.reserve(code.size());
+	for (const auto c : code) {
+		if (isdigit(c)) {
+			filtered_code.push_back(c);
+		}
+	}
+	return filtered_code;
+}
+
+uint32_t DateCodeToUint32(const std::string& code, bool include_day) {
+    // Keep digits only.
+    std::string filtered_code = DigitsOnly(code);
+
+    // Return 0 if the date string has an unexpected number of digits.
+    uint32_t return_value = 0;
+    if (filtered_code.size() == 8) {
+        return_value = std::stoi(filtered_code);
+        if (!include_day) {
+            return_value /= 100;
+        }
+    } else if (filtered_code.size() == 6) {
+        return_value = std::stoi(filtered_code);
+        if (include_day) {
+            return_value *= 100;
+        }
+    }
+    return return_value;
+}
+
+}  // namespace
+
 // std
 using std::string;
+
+// base
+using ::android::base::GetProperty;
 
 // libhidl
 using ::android::hardware::Void;
@@ -147,6 +193,16 @@ static ErrorCode status_to_error_code(uint32_t status)
 }
 
 // Methods from ::android::hardware::keymaster::V3_0::IKeymasterDevice follow.
+
+KeymasterDevice::KeymasterDevice(KeymasterClient& keymaster) :
+        _keymaster{keymaster} {
+    os_version = std::stoi(DigitsOnly(GetProperty(PROPERTY_OS_VERSION, "")));
+    os_patchlevel = DateCodeToUint32(GetProperty(PROPERTY_OS_PATCHLEVEL, ""),
+                                     false);
+    vendor_patchlevel = DateCodeToUint32(
+            GetProperty(PROPERTY_VENDOR_PATCHLEVEL, ""), true);
+    // TODO(b/80248239) Hand these off to citadel.
+}
 
 Return<void> KeymasterDevice::getHardwareInfo(
         getHardwareInfo_cb _hidl_cb)
