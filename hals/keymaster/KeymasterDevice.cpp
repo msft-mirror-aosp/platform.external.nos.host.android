@@ -42,15 +42,11 @@ constexpr char PROPERTY_OS_PATCHLEVEL[] = "ro.build.version.security_patch";
 constexpr char PROPERTY_VENDOR_PATCHLEVEL[] = "ro.vendor.build.security_patch";
 
 std::string DigitsOnly(const std::string& code) {
-	// Keep digits only.
-	std::string filtered_code;
-	filtered_code.reserve(code.size());
-	for (const auto c : code) {
-		if (isdigit(c)) {
-			filtered_code.push_back(c);
-		}
-	}
-	return filtered_code;
+    // Keep digits only.
+    std::string filtered_code;
+    std::copy_if(code.begin(), code.end(), std::back_inserter(filtered_code),
+                 isdigit);
+    return filtered_code;
 }
 
 uint32_t DateCodeToUint32(const std::string& code, bool include_day) {
@@ -198,9 +194,10 @@ KeymasterDevice::KeymasterDevice(KeymasterClient& keymaster) :
         _keymaster{keymaster} {
     os_version = std::stoi(DigitsOnly(GetProperty(PROPERTY_OS_VERSION, "")));
     os_patchlevel = DateCodeToUint32(GetProperty(PROPERTY_OS_PATCHLEVEL, ""),
-                                     false);
+                                     false /* include_day */);
     vendor_patchlevel = DateCodeToUint32(
-            GetProperty(PROPERTY_VENDOR_PATCHLEVEL, ""), true);
+            GetProperty(PROPERTY_VENDOR_PATCHLEVEL, ""),
+            true /* include_day */);
     // TODO(b/80248239) Hand these off to citadel.
 }
 
