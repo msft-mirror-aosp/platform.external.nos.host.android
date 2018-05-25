@@ -126,6 +126,8 @@ using ::nugget::app::keymaster::ComputeSharedHmacRequest;
 using ::nugget::app::keymaster::ComputeSharedHmacResponse;
 using ::nugget::app::keymaster::GetHmacSharingParametersRequest;
 using ::nugget::app::keymaster::GetHmacSharingParametersResponse;
+using ::nugget::app::keymaster::SetSystemVersionInfoRequest;
+using ::nugget::app::keymaster::SetSystemVersionInfoResponse;
 
 // KM 4.0 types
 using ::nugget::app::keymaster::ImportWrappedKeyRequest;
@@ -198,7 +200,24 @@ KeymasterDevice::KeymasterDevice(KeymasterClient& keymaster) :
     vendor_patchlevel = DateCodeToUint32(
             GetProperty(PROPERTY_VENDOR_PATCHLEVEL, ""),
             true /* include_day */);
-    // TODO(b/80248239) Hand these off to citadel.
+
+    SetSystemVersionInfoRequest request;
+    SetSystemVersionInfoResponse response;
+
+    request.set_system_version(os_version);
+    request.set_system_security_level(os_patchlevel);
+    request.set_vendor_security_level(os_patchlevel);
+
+    const uint32_t status = _keymaster.SetSystemVersionInfo(request, &response);
+    const ErrorCode error_code = translate_error_code(response.error_code());
+    if (status != APP_SUCCESS) {
+        LOG(ERROR) << "SetSystemVersionInfo : request failed with status: "
+                   << nos::StatusCodeString(status);
+    }
+    if (error_code != ErrorCode::OK) {
+        LOG(WARNING) << "SetSystemVersionInfo : device response error code: "
+                     << error_code;
+    }
 }
 
 Return<void> KeymasterDevice::getHardwareInfo(
