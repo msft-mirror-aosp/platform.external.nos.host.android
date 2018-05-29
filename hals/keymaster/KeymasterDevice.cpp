@@ -206,7 +206,7 @@ KeymasterDevice::KeymasterDevice(KeymasterClient& keymaster) :
 
     request.set_system_version(os_version);
     request.set_system_security_level(os_patchlevel);
-    request.set_vendor_security_level(os_patchlevel);
+    request.set_vendor_security_level(vendor_patchlevel);
 
     const uint32_t status = _keymaster.SetSystemVersionInfo(request, &response);
     const ErrorCode error_code = translate_error_code(response.error_code());
