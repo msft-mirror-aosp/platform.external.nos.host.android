@@ -128,6 +128,8 @@ using ::nugget::app::keymaster::GetHmacSharingParametersRequest;
 using ::nugget::app::keymaster::GetHmacSharingParametersResponse;
 using ::nugget::app::keymaster::SetSystemVersionInfoRequest;
 using ::nugget::app::keymaster::SetSystemVersionInfoResponse;
+using ::nugget::app::keymaster::GetBootInfoRequest;
+using ::nugget::app::keymaster::GetBootInfoResponse;
 
 // KM 4.0 types
 using ::nugget::app::keymaster::ImportWrappedKeyRequest;
@@ -194,30 +196,15 @@ static ErrorCode status_to_error_code(uint32_t status)
 
 KeymasterDevice::KeymasterDevice(KeymasterClient& keymaster) :
         _keymaster{keymaster} {
-    os_version = std::stoi(DigitsOnly(GetProperty(PROPERTY_OS_VERSION, "")));
-    os_patchlevel = DateCodeToUint32(GetProperty(PROPERTY_OS_PATCHLEVEL, ""),
+    _os_version = std::stoi(DigitsOnly(GetProperty(PROPERTY_OS_VERSION, "")));
+    _os_patchlevel = DateCodeToUint32(GetProperty(PROPERTY_OS_PATCHLEVEL, ""),
                                      false /* include_day */);
-    vendor_patchlevel = DateCodeToUint32(
+    _vendor_patchlevel = DateCodeToUint32(
             GetProperty(PROPERTY_VENDOR_PATCHLEVEL, ""),
             true /* include_day */);
 
-    SetSystemVersionInfoRequest request;
-    SetSystemVersionInfoResponse response;
-
-    request.set_system_version(os_version);
-    request.set_system_security_level(os_patchlevel);
-    request.set_vendor_security_level(vendor_patchlevel);
-
-    const uint32_t status = _keymaster.SetSystemVersionInfo(request, &response);
-    const ErrorCode error_code = translate_error_code(response.error_code());
-    if (status != APP_SUCCESS) {
-        LOG(ERROR) << "SetSystemVersionInfo : request failed with status: "
-                   << nos::StatusCodeString(status);
-    }
-    if (error_code != ErrorCode::OK) {
-        LOG(WARNING) << "SetSystemVersionInfo : device response error code: "
-                     << error_code;
-    }
+    SendSystemVersionInfo();
+    GetBootInfo();
 }
 
 Return<void> KeymasterDevice::getHardwareInfo(
@@ -809,6 +796,32 @@ Return<void> KeymasterDevice::importWrappedKey(
 
     _hidl_cb(ErrorCode::OK, blob, characteristics);
     return Void();
+}
+
+// Private methods.
+Return<ErrorCode> KeymasterDevice::SendSystemVersionInfo() const {
+    SetSystemVersionInfoRequest request;
+    SetSystemVersionInfoResponse response;
+
+    request.set_system_version(_os_version);
+    request.set_system_security_level(_os_patchlevel);
+    request.set_vendor_security_level(_vendor_patchlevel);
+
+    KM_CALL(SetSystemVersionInfo);
+    return ErrorCode::OK;
+}
+
+Return<ErrorCode> KeymasterDevice::GetBootInfo() {
+    GetBootInfoRequest request;
+    GetBootInfoResponse response;
+
+    KM_CALL(GetBootInfo);
+
+    _is_unlocked = response.is_unlocked();
+    _boot_color = response.boot_color();
+    _boot_key.assign(response.boot_key().begin(), response.boot_key().end());
+    _boot_hash.assign(response.boot_hash().begin(), response.boot_hash().end());
+    return ErrorCode::OK;
 }
 
 }  // namespace keymaster
