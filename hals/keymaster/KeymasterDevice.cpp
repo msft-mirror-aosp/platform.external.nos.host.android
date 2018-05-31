@@ -49,6 +49,34 @@ std::string DigitsOnly(const std::string& code) {
     return filtered_code;
 }
 
+/** Get one version number from a string and move loc to the point after the
+ * next version delimiter.
+ */
+uint32_t ExtractVersion(const std::string& version, size_t* loc) {
+    if (*loc == std::string::npos || *loc >= version.size()) {
+        return 0;
+    }
+
+    uint32_t value = 0;
+    size_t new_loc = version.find('.', *loc);
+    if (new_loc == std::string::npos) {
+        value = std::stoi(DigitsOnly(version.substr(*loc)));
+        *loc = new_loc;
+    } else {
+        value = std::stoi(DigitsOnly(version.substr(*loc, new_loc - *loc)));
+        *loc = new_loc + 1;
+    }
+    return value;
+}
+
+uint32_t VersionToUint32(const std::string& version) {
+    size_t loc = 0;
+    uint32_t major = ExtractVersion(version, &loc);
+    uint32_t minor = ExtractVersion(version, &loc);
+    uint32_t subminor = ExtractVersion(version, &loc);
+    return major * 10000 + minor * 100 + subminor;
+}
+
 uint32_t DateCodeToUint32(const std::string& code, bool include_day) {
     // Keep digits only.
     std::string filtered_code = DigitsOnly(code);
@@ -196,7 +224,7 @@ static ErrorCode status_to_error_code(uint32_t status)
 
 KeymasterDevice::KeymasterDevice(KeymasterClient& keymaster) :
         _keymaster{keymaster} {
-    _os_version = std::stoi(DigitsOnly(GetProperty(PROPERTY_OS_VERSION, "")));
+    _os_version = VersionToUint32(GetProperty(PROPERTY_OS_VERSION, ""));
     _os_patchlevel = DateCodeToUint32(GetProperty(PROPERTY_OS_PATCHLEVEL, ""),
                                      false /* include_day */);
     _vendor_patchlevel = DateCodeToUint32(
