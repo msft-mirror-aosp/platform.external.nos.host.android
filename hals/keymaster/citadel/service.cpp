@@ -26,7 +26,9 @@
 #include <KeymasterDevice.h>
 #include <Keymaster.client.h>
 
+#ifdef ENABLE_QCOM_OTF_PROVISIONING
 #include <KeymasterKeyProvision.h>
+#endif
 #include <nugget/app/keymaster/keymaster.pb.h>
 #include "../proto_utils.h"
 
@@ -49,6 +51,7 @@ using ::android::hardware::keymaster::V4_0::ErrorCode;
 
 using KeymasterClient = ::nugget::app::keymaster::Keymaster;
 
+#ifdef ENABLE_QCOM_OTF_PROVISIONING
 // TODO(ngm): move this code into the HAL implementation.
 static bool alreadyProvisioned(KeymasterClient *keymasterClient) {
     ProvisionPresharedSecretRequest request;
@@ -117,6 +120,11 @@ static bool maybeProvision(KeymasterClient *keymasterClient) {
 
     return true;
 }
+#else
+static bool maybeProvision(KeymasterClient *) {
+    return true;
+}
+#endif
 
 int main() {
     LOG(INFO) << "Keymaster HAL service starting";
