@@ -27,13 +27,55 @@
 #include <keymasterV4_0/key_param_output.h>
 
 #include <android-base/logging.h>
+#include <android-base/properties.h>
+
+#include <algorithm>
 
 namespace android {
 namespace hardware {
 namespace keymaster {
 
+namespace {
+
+constexpr char PROPERTY_OS_VERSION[] = "ro.build.version.release";
+constexpr char PROPERTY_OS_PATCHLEVEL[] = "ro.build.version.security_patch";
+constexpr char PROPERTY_VENDOR_PATCHLEVEL[] = "ro.vendor.build.security_patch";
+
+std::string DigitsOnly(const std::string& code) {
+    // Keep digits only.
+    std::string filtered_code;
+    std::copy_if(code.begin(), code.end(), std::back_inserter(filtered_code),
+                 isdigit);
+    return filtered_code;
+}
+
+uint32_t DateCodeToUint32(const std::string& code, bool include_day) {
+    // Keep digits only.
+    std::string filtered_code = DigitsOnly(code);
+
+    // Return 0 if the date string has an unexpected number of digits.
+    uint32_t return_value = 0;
+    if (filtered_code.size() == 8) {
+        return_value = std::stoi(filtered_code);
+        if (!include_day) {
+            return_value /= 100;
+        }
+    } else if (filtered_code.size() == 6) {
+        return_value = std::stoi(filtered_code);
+        if (include_day) {
+            return_value *= 100;
+        }
+    }
+    return return_value;
+}
+
+}  // namespace
+
 // std
 using std::string;
+
+// base
+using ::android::base::GetProperty;
 
 // libhidl
 using ::android::hardware::Void;
@@ -84,6 +126,10 @@ using ::nugget::app::keymaster::ComputeSharedHmacRequest;
 using ::nugget::app::keymaster::ComputeSharedHmacResponse;
 using ::nugget::app::keymaster::GetHmacSharingParametersRequest;
 using ::nugget::app::keymaster::GetHmacSharingParametersResponse;
+using ::nugget::app::keymaster::SetSystemVersionInfoRequest;
+using ::nugget::app::keymaster::SetSystemVersionInfoResponse;
+using ::nugget::app::keymaster::GetBootInfoRequest;
+using ::nugget::app::keymaster::GetBootInfoResponse;
 
 // KM 4.0 types
 using ::nugget::app::keymaster::ImportWrappedKeyRequest;
@@ -147,6 +193,19 @@ static ErrorCode status_to_error_code(uint32_t status)
 }
 
 // Methods from ::android::hardware::keymaster::V3_0::IKeymasterDevice follow.
+
+KeymasterDevice::KeymasterDevice(KeymasterClient& keymaster) :
+        _keymaster{keymaster} {
+    _os_version = std::stoi(DigitsOnly(GetProperty(PROPERTY_OS_VERSION, "")));
+    _os_patchlevel = DateCodeToUint32(GetProperty(PROPERTY_OS_PATCHLEVEL, ""),
+                                     false /* include_day */);
+    _vendor_patchlevel = DateCodeToUint32(
+            GetProperty(PROPERTY_VENDOR_PATCHLEVEL, ""),
+            true /* include_day */);
+
+    SendSystemVersionInfo();
+    GetBootInfo();
+}
 
 Return<void> KeymasterDevice::getHardwareInfo(
         getHardwareInfo_cb _hidl_cb)
@@ -737,6 +796,32 @@ Return<void> KeymasterDevice::importWrappedKey(
 
     _hidl_cb(ErrorCode::OK, blob, characteristics);
     return Void();
+}
+
+// Private methods.
+Return<ErrorCode> KeymasterDevice::SendSystemVersionInfo() const {
+    SetSystemVersionInfoRequest request;
+    SetSystemVersionInfoResponse response;
+
+    request.set_system_version(_os_version);
+    request.set_system_security_level(_os_patchlevel);
+    request.set_vendor_security_level(_vendor_patchlevel);
+
+    KM_CALL(SetSystemVersionInfo);
+    return ErrorCode::OK;
+}
+
+Return<ErrorCode> KeymasterDevice::GetBootInfo() {
+    GetBootInfoRequest request;
+    GetBootInfoResponse response;
+
+    KM_CALL(GetBootInfo);
+
+    _is_unlocked = response.is_unlocked();
+    _boot_color = response.boot_color();
+    _boot_key.assign(response.boot_key().begin(), response.boot_key().end());
+    _boot_hash.assign(response.boot_hash().begin(), response.boot_hash().end());
+    return ErrorCode::OK;
 }
 
 }  // namespace keymaster
