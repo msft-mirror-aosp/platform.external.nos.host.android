@@ -34,11 +34,8 @@ LOCAL_SHARED_LIBRARIES := \
     android.hardware.keymaster@4.0 \
     android.hardware.keymaster@4.0-impl.nos \
     libnos_citadeld_proxy \
-    nos_app_keymaster \
-    libkeymasterprovision \
-    libkeymasterutils \
-    libkeymasterdeviceutils \
-    libQSEEComAPI
+    nos_app_keymaster
+
 
 LOCAL_MODULE_RELATIVE_PATH := hw
 
@@ -48,13 +45,19 @@ LOCAL_CLANG := true
 LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_OWNER := google
 
-# TODO: sort out QC component dependency.
-# The QC libraries aren't available to all build targets so only build this
-# component which depends on them when they are available.
-# See vendor/qcom/sdm845/proprietary/prebuilt_grease/Android.mk
-ifeq ($(call is-board-platform,sdm845),true)
-  include $(BUILD_EXECUTABLE)
+ifneq ($(BUILD_WITHOUT_VENDOR),true)
+ifeq ($(call is-board-platform-in-list, sdm845),true)
+LOCAL_SHARED_LIBRARIES += \
+    libkeymasterprovision \
+    libkeymasterutils \
+    libkeymasterdeviceutils \
+    libQSEEComAPI
+
+LOCAL_CFLAGS += -DENABLE_QCOM_OTF_PROVISIONING=1
 endif
+endif
+
+include $(BUILD_EXECUTABLE)
 
 #cc_binary {
 #    name: "android.hardware.keymaster@4.0-service.citadel",
