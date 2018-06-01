@@ -603,6 +603,12 @@ ErrorCode key_parameter_to_pb(const KeyParameter& param,
     case Tag::ATTESTATION_ID_MEID: // (TagType:BYTES | 715)
     case Tag::ATTESTATION_ID_MANUFACTURER: // (TagType:BYTES | 716)
     case Tag::ATTESTATION_ID_MODEL: // (TagType:BYTES | 717)
+        pb->set_blob(&param.blob[0], param.blob.size());
+        break;
+    case Tag::VENDOR_PATCHLEVEL: // (TagType:UINT | 718)
+    case Tag::BOOT_PATCHLEVEL: // (TagType:UINT | 719)
+        pb->set_integer(param.f.integer);
+        break;
     case Tag::ASSOCIATED_DATA: // (TagType:BYTES | 1000)
     case Tag::NONCE: // (TagType:BYTES | 1001)
         pb->set_blob(&param.blob[0], param.blob.size());
@@ -765,6 +771,14 @@ ErrorCode pb_to_key_parameter(const nosapp::KeyParameter& param,
     case nosapp::Tag::ATTESTATION_ID_MEID: // (TagType:BYTES | 715)
     case nosapp::Tag::ATTESTATION_ID_MANUFACTURER: // (TagType:BYTES | 716)
     case nosapp::Tag::ATTESTATION_ID_MODEL: // (TagType:BYTES | 717)
+        kp->blob.setToExternal(
+            reinterpret_cast<uint8_t *>(
+                const_cast<char *>(param.blob().data())), param.blob().size());
+        break;
+    case nosapp::Tag::VENDOR_PATCHLEVEL: // (TagType:UINT | 718)
+    case nosapp::Tag::BOOT_PATCHLEVEL: // (TagType:UINT | 719)
+        kp->f.integer = param.integer();
+        break;
     case nosapp::Tag::ASSOCIATED_DATA: // (TagType:BYTES | 1000)
     case nosapp::Tag::NONCE: // (TagType:BYTES | 1001)
         kp->blob.setToExternal(

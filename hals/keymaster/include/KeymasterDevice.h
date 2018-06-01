@@ -21,6 +21,8 @@
 
 #include <Keymaster.client.h>
 
+#include <vector>
+
 namespace android {
 namespace hardware {
 namespace keymaster {
@@ -35,13 +37,14 @@ using ::android::hardware::keymaster::V4_0::KeyPurpose;
 using ::android::hardware::keymaster::V4_0::VerificationToken;
 using ::android::hardware::Return;
 using ::android::hardware::hidl_vec;
+using ::nugget::app::keymaster::BootColor;
 
 #define KM_MAX_PROTO_FIELD_SIZE 2048
 
 using KeymasterClient = ::nugget::app::keymaster::IKeymaster;
 
 struct KeymasterDevice : public IKeymasterDevice {
-    KeymasterDevice(KeymasterClient& keymaster) : _keymaster{keymaster} {}
+    KeymasterDevice(KeymasterClient& keymaster);
     ~KeymasterDevice() override = default;
 
     // Methods from ::android::hardware::keymaster::V4_0::IKeymasterDevice follow.
@@ -105,6 +108,19 @@ struct KeymasterDevice : public IKeymasterDevice {
 
 private:
     KeymasterClient& _keymaster;
+    // These come from GetProperty.
+    uint32_t _os_version;
+    uint32_t _os_patchlevel;
+    uint32_t _vendor_patchlevel;
+
+    // These come from the bootloader through Citadel.
+    bool _is_unlocked;
+    BootColor _boot_color;
+    std::vector<uint8_t> _boot_key;
+    std::vector<uint8_t> _boot_hash;
+
+    Return<ErrorCode> SendSystemVersionInfo() const;
+    Return<ErrorCode> GetBootInfo();
 };
 
 }  // namespace keymaster
