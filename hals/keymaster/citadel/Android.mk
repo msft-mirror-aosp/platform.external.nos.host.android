@@ -48,7 +48,13 @@ LOCAL_CLANG := true
 LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_OWNER := google
 
-include $(BUILD_EXECUTABLE)
+# TODO: sort out QC component dependency.
+# The QC libraries aren't available to all build targets so only build this
+# component which depends on them when they are available.
+# See vendor/qcom/sdm845/proprietary/prebuilt_grease/Android.mk
+ifeq ($(call is-board-platform,sdm845),true)
+  include $(BUILD_EXECUTABLE)
+endif
 
 #cc_binary {
 #    name: "android.hardware.keymaster@4.0-service.citadel",
