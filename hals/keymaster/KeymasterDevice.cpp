@@ -27,13 +27,55 @@
 #include <keymasterV4_0/key_param_output.h>
 
 #include <android-base/logging.h>
+#include <android-base/properties.h>
+
+#include <algorithm>
 
 namespace android {
 namespace hardware {
 namespace keymaster {
 
+namespace {
+
+constexpr char PROPERTY_OS_VERSION[] = "ro.build.version.release";
+constexpr char PROPERTY_OS_PATCHLEVEL[] = "ro.build.version.security_patch";
+constexpr char PROPERTY_VENDOR_PATCHLEVEL[] = "ro.vendor.build.security_patch";
+
+std::string DigitsOnly(const std::string& code) {
+    // Keep digits only.
+    std::string filtered_code;
+    std::copy_if(code.begin(), code.end(), std::back_inserter(filtered_code),
+                 isdigit);
+    return filtered_code;
+}
+
+uint32_t DateCodeToUint32(const std::string& code, bool include_day) {
+    // Keep digits only.
+    std::string filtered_code = DigitsOnly(code);
+
+    // Return 0 if the date string has an unexpected number of digits.
+    uint32_t return_value = 0;
+    if (filtered_code.size() == 8) {
+        return_value = std::stoi(filtered_code);
+        if (!include_day) {
+            return_value /= 100;
+        }
+    } else if (filtered_code.size() == 6) {
+        return_value = std::stoi(filtered_code);
+        if (include_day) {
+            return_value *= 100;
+        }
+    }
+    return return_value;
+}
+
+}  // namespace
+
 // std
 using std::string;
+
+// base
+using ::android::base::GetProperty;
 
 // libhidl
 using ::android::hardware::Void;
@@ -42,6 +84,8 @@ using ::android::hardware::Void;
 using ::android::hardware::keymaster::V4_0::Algorithm;
 using ::android::hardware::keymaster::V4_0::KeyCharacteristics;
 using ::android::hardware::keymaster::V4_0::KeyFormat;
+using ::android::hardware::keymaster::V4_0::HardwareAuthToken;
+using ::android::hardware::keymaster::V4_0::HardwareAuthenticatorType;
 using ::android::hardware::keymaster::V4_0::SecurityLevel;
 using ::android::hardware::keymaster::V4_0::Tag;
 
@@ -78,9 +122,18 @@ using ::nugget::app::keymaster::FinishOperationRequest;
 using ::nugget::app::keymaster::FinishOperationResponse;
 using ::nugget::app::keymaster::AbortOperationRequest;
 using ::nugget::app::keymaster::AbortOperationResponse;
+using ::nugget::app::keymaster::ComputeSharedHmacRequest;
+using ::nugget::app::keymaster::ComputeSharedHmacResponse;
+using ::nugget::app::keymaster::GetHmacSharingParametersRequest;
+using ::nugget::app::keymaster::GetHmacSharingParametersResponse;
+using ::nugget::app::keymaster::SetSystemVersionInfoRequest;
+using ::nugget::app::keymaster::SetSystemVersionInfoResponse;
+using ::nugget::app::keymaster::GetBootInfoRequest;
+using ::nugget::app::keymaster::GetBootInfoResponse;
 
 // KM 4.0 types
 using ::nugget::app::keymaster::ImportWrappedKeyRequest;
+namespace nosapp = ::nugget::app::keymaster;
 
 static ErrorCode status_to_error_code(uint32_t status)
 {
@@ -141,6 +194,19 @@ static ErrorCode status_to_error_code(uint32_t status)
 
 // Methods from ::android::hardware::keymaster::V3_0::IKeymasterDevice follow.
 
+KeymasterDevice::KeymasterDevice(KeymasterClient& keymaster) :
+        _keymaster{keymaster} {
+    _os_version = std::stoi(DigitsOnly(GetProperty(PROPERTY_OS_VERSION, "")));
+    _os_patchlevel = DateCodeToUint32(GetProperty(PROPERTY_OS_PATCHLEVEL, ""),
+                                     false /* include_day */);
+    _vendor_patchlevel = DateCodeToUint32(
+            GetProperty(PROPERTY_VENDOR_PATCHLEVEL, ""),
+            true /* include_day */);
+
+    SendSystemVersionInfo();
+    GetBootInfo();
+}
+
 Return<void> KeymasterDevice::getHardwareInfo(
         getHardwareInfo_cb _hidl_cb)
 {
@@ -158,8 +224,42 @@ Return<void> KeymasterDevice::getHmacSharingParameters(
 {
     LOG(VERBOSE) << "Running KeymasterDevice::getHmacSharingParameters";
 
-    (void)_keymaster;
-    _hidl_cb(ErrorCode::UNIMPLEMENTED, HmacSharingParameters());
+    GetHmacSharingParametersRequest request;
+    GetHmacSharingParametersResponse response;
+    HmacSharingParameters result;
+
+    KM_CALLV(GetHmacSharingParameters, result);
+
+    ErrorCode ec = translate_error_code(response.error_code());
+
+    if (ec != ErrorCode::OK) {
+        _hidl_cb(ec, HmacSharingParameters());
+    }
+
+    const std::string & nonce = response.hmac_sharing_params().nonce();
+    const std::string & seed = response.hmac_sharing_params().seed();
+
+    if (seed.size() == 32) {
+        result.seed.setToExternal(reinterpret_cast<uint8_t*>(
+                const_cast<char*>(seed.data())),
+                seed.size(), false);
+    } else if (seed.size() != 0) {
+        LOG(ERROR) << "Citadel returned unexpected seed size: "
+                << seed.size();
+        _hidl_cb(ErrorCode::UNKNOWN_ERROR, HmacSharingParameters());
+        return Void();
+    }
+
+    if (nonce.size() == result.nonce.size()) {
+        std::copy(nonce.begin(), nonce.end(), result.nonce.data());
+    } else {
+        LOG(ERROR) << "Citadel returned unexpected nonce size: "
+                << nonce.size();
+        _hidl_cb(ErrorCode::UNKNOWN_ERROR, HmacSharingParameters());
+        return Void();
+    }
+
+    _hidl_cb(ec, result);
 
     return Void();
 }
@@ -168,23 +268,49 @@ Return<void> KeymasterDevice::computeSharedHmac(
     const hidl_vec<HmacSharingParameters>& params,
     computeSharedHmac_cb _hidl_cb)
 {
-     LOG(VERBOSE) << "Running KeymasterDevice::computeSharedHmac";
+    LOG(VERBOSE) << "Running KeymasterDevice::computeSharedHmac";
 
-    (void)params;
+    ComputeSharedHmacRequest request;
+    ComputeSharedHmacResponse response;
+    hidl_vec<uint8_t> result;
 
-    (void)_keymaster;
-    _hidl_cb(ErrorCode::UNIMPLEMENTED, hidl_vec<uint8_t>{});
+    for (const HmacSharingParameters & param : params) {
+        // TODO respect max number of parameters defined in
+        // keymaster_types.proto
+        nosapp::HmacSharingParameters* req_param =
+                request.add_hmac_sharing_params();
+        req_param->set_nonce(
+                reinterpret_cast<const int8_t*>(
+                param.nonce.data()), param.nonce.size());
+        req_param->set_seed(reinterpret_cast<const int8_t*>(param.seed.data()),
+                param.seed.size());
+    }
+
+    KM_CALLV(ComputeSharedHmac, result);
+
+    ErrorCode ec = translate_error_code(response.error_code());
+
+    if (ec != ErrorCode::OK) {
+        _hidl_cb(ec, result);
+        return Void();
+    }
+
+    const std::string & share_check = response.sharing_check();
+
+    result.setToExternal(reinterpret_cast<uint8_t*>(
+            const_cast<char*>(share_check.data())), share_check.size(), false);
+    _hidl_cb(ec, result);
 
     return Void();
 }
 
 Return<void> KeymasterDevice::verifyAuthorization(
-    uint64_t challenge, const hidl_vec<KeyParameter>& parametersToVerify,
+    uint64_t operationHandle, const hidl_vec<KeyParameter>& parametersToVerify,
     const HardwareAuthToken& authToken, verifyAuthorization_cb _hidl_cb)
 {
     LOG(VERBOSE) << "Running KeymasterDevice::verifyAuthorization";
 
-    (void)challenge;
+    (void)operationHandle;
     (void)parametersToVerify;
     (void)authToken;
 
@@ -465,10 +591,14 @@ Return<void> KeymasterDevice::begin(
 
     request.set_purpose((::nugget::app::keymaster::KeyPurpose)purpose);
     request.mutable_blob()->set_blob(&key[0], key.size());
-    // TODO: set request.auth_token().
-    (void)authToken;
 
     hidl_vec<KeyParameter> params;
+    if (translate_auth_token(
+            authToken, request.mutable_auth_token()) != ErrorCode::OK) {
+        _hidl_cb(ErrorCode::INVALID_ARGUMENT, params,
+                 response.handle().handle());
+        return Void();
+    }
     if (hidl_params_to_pb(
             inParams, request.mutable_params()) != ErrorCode::OK) {
       _hidl_cb(ErrorCode::INVALID_ARGUMENT, params,
@@ -521,9 +651,13 @@ Return<void> KeymasterDevice::update(
     }
 
     request.set_input(&input[0], input.size());
-    // TODO: add authToken and verificationToken.
-    (void)authToken;
-    (void)verificationToken;
+    if (translate_auth_token(
+            authToken, request.mutable_auth_token()) != ErrorCode::OK) {
+        _hidl_cb(ErrorCode::INVALID_ARGUMENT, 0, params, output);
+        return Void();
+    }
+    translate_verification_token(verificationToken,
+                                 request.mutable_verification_token());
 
     KM_CALLV(UpdateOperation, 0, hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
 
@@ -575,9 +709,13 @@ Return<void> KeymasterDevice::finish(
     request.set_input(&input[0], input.size());
     request.set_signature(&signature[0], signature.size());
 
-    // TODO: add authToken and verificationToken.
-    (void)authToken;
-    (void)verificationToken;
+    if (translate_auth_token(
+            authToken, request.mutable_auth_token()) != ErrorCode::OK) {
+        _hidl_cb(ErrorCode::INVALID_ARGUMENT, params, output);
+        return Void();
+    }
+    translate_verification_token(verificationToken,
+                                 request.mutable_verification_token());
 
     KM_CALLV(FinishOperation, hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
 
@@ -658,6 +796,32 @@ Return<void> KeymasterDevice::importWrappedKey(
 
     _hidl_cb(ErrorCode::OK, blob, characteristics);
     return Void();
+}
+
+// Private methods.
+Return<ErrorCode> KeymasterDevice::SendSystemVersionInfo() const {
+    SetSystemVersionInfoRequest request;
+    SetSystemVersionInfoResponse response;
+
+    request.set_system_version(_os_version);
+    request.set_system_security_level(_os_patchlevel);
+    request.set_vendor_security_level(_vendor_patchlevel);
+
+    KM_CALL(SetSystemVersionInfo);
+    return ErrorCode::OK;
+}
+
+Return<ErrorCode> KeymasterDevice::GetBootInfo() {
+    GetBootInfoRequest request;
+    GetBootInfoResponse response;
+
+    KM_CALL(GetBootInfo);
+
+    _is_unlocked = response.is_unlocked();
+    _boot_color = response.boot_color();
+    _boot_key.assign(response.boot_key().begin(), response.boot_key().end());
+    _boot_hash.assign(response.boot_hash().begin(), response.boot_hash().end());
+    return ErrorCode::OK;
 }
 
 }  // namespace keymaster

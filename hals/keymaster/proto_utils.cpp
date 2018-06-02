@@ -445,6 +445,53 @@ static ErrorCode translate_key_origin(nosapp::KeyOrigin key_origin,
     return ErrorCode::OK;
 }
 
+ErrorCode translate_auth_token(const HardwareAuthToken& auth_token,
+                               nosapp::HardwareAuthToken *out)
+{
+    out->set_challenge(auth_token.challenge);
+    out->set_user_id(auth_token.userId);
+    out->set_authenticator_id(auth_token.authenticatorId);
+
+    switch (auth_token.authenticatorType) {
+    case HardwareAuthenticatorType::NONE:
+        out->set_authenticator_type(
+            nosapp::HardwareAuthenticatorType::AUTH_NONE);
+        break;
+    case HardwareAuthenticatorType::PASSWORD:
+        out->set_authenticator_type(
+            nosapp::HardwareAuthenticatorType::AUTH_PASSWORD);
+        break;
+    case HardwareAuthenticatorType::FINGERPRINT:
+        out->set_authenticator_type(
+            nosapp::HardwareAuthenticatorType::AUTH_FINGERPRINT);
+        break;
+    case HardwareAuthenticatorType::ANY:
+        out->set_authenticator_type(
+            nosapp::HardwareAuthenticatorType::AUTH_ANY);
+        break;
+    default:
+        return ErrorCode::UNKNOWN_ERROR;
+    }
+
+    out->set_timestamp(auth_token.timestamp);
+    out->set_mac(&auth_token.mac[0], auth_token.mac.size());
+
+    return ErrorCode::OK;
+}
+
+void translate_verification_token(
+    const VerificationToken& verification_token,
+    nosapp::VerificationToken *out)
+{
+    out->set_challenge(verification_token.challenge);
+    out->set_timestamp(verification_token.timestamp);
+    hidl_params_to_pb(verification_token.parametersVerified,
+                      out->mutable_params_verified());
+    out->set_security_level(nosapp::SecurityLevel::STRONGBOX);
+    out->set_mac(verification_token.mac.data(),
+                 verification_token.mac.size());
+}
+
 ErrorCode key_parameter_to_pb(const KeyParameter& param,
                               nosapp::KeyParameter *pb)
 {
@@ -556,6 +603,12 @@ ErrorCode key_parameter_to_pb(const KeyParameter& param,
     case Tag::ATTESTATION_ID_MEID: // (TagType:BYTES | 715)
     case Tag::ATTESTATION_ID_MANUFACTURER: // (TagType:BYTES | 716)
     case Tag::ATTESTATION_ID_MODEL: // (TagType:BYTES | 717)
+        pb->set_blob(&param.blob[0], param.blob.size());
+        break;
+    case Tag::VENDOR_PATCHLEVEL: // (TagType:UINT | 718)
+    case Tag::BOOT_PATCHLEVEL: // (TagType:UINT | 719)
+        pb->set_integer(param.f.integer);
+        break;
     case Tag::ASSOCIATED_DATA: // (TagType:BYTES | 1000)
     case Tag::NONCE: // (TagType:BYTES | 1001)
         pb->set_blob(&param.blob[0], param.blob.size());
@@ -718,6 +771,14 @@ ErrorCode pb_to_key_parameter(const nosapp::KeyParameter& param,
     case nosapp::Tag::ATTESTATION_ID_MEID: // (TagType:BYTES | 715)
     case nosapp::Tag::ATTESTATION_ID_MANUFACTURER: // (TagType:BYTES | 716)
     case nosapp::Tag::ATTESTATION_ID_MODEL: // (TagType:BYTES | 717)
+        kp->blob.setToExternal(
+            reinterpret_cast<uint8_t *>(
+                const_cast<char *>(param.blob().data())), param.blob().size());
+        break;
+    case nosapp::Tag::VENDOR_PATCHLEVEL: // (TagType:UINT | 718)
+    case nosapp::Tag::BOOT_PATCHLEVEL: // (TagType:UINT | 719)
+        kp->f.integer = param.integer();
+        break;
     case nosapp::Tag::ASSOCIATED_DATA: // (TagType:BYTES | 1000)
     case nosapp::Tag::NONCE: // (TagType:BYTES | 1001)
         kp->blob.setToExternal(

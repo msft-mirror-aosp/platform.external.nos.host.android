@@ -107,8 +107,8 @@ void TryEnrollCitadelUpdatePassword(NuggetClientInterface& client,
 
 /** Request a hard reboot of Citadel. */
 void RebootCitadel(NuggetClientInterface& client) {
-    std::vector<uint8_t> buffer = {NUGGET_REBOOT_HARD};
-    const uint32_t appStatus = client.CallApp(APP_ID_NUGGET, NUGGET_PARAM_REBOOT, buffer, nullptr);
+    std::vector<uint8_t> ignored = {1};         // older images require this
+    const uint32_t appStatus = client.CallApp(APP_ID_NUGGET, NUGGET_PARAM_REBOOT, ignored, nullptr);
     if (appStatus != APP_SUCCESS) {
         LOG(ERROR) << "Citadel failed to reboot: " << ::nos::StatusCodeString(appStatus)
                    << " (" << appStatus << ")";
