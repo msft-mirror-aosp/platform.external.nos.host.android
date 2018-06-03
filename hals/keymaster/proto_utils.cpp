@@ -127,8 +127,8 @@ static nosapp::Algorithm translate_algorithm(Algorithm algorithm)
     }
 }
 
-static ErrorCode translate_algorithm(nosapp::Algorithm algorithm,
-                                     Algorithm *out)
+ErrorCode translate_algorithm(nosapp::Algorithm algorithm,
+                              Algorithm *out)
 {
     switch (algorithm) {
     case nosapp::Algorithm::RSA:

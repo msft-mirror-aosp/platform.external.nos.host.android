@@ -15,6 +15,7 @@
  */
 
 #include "KeymasterDevice.h"
+#include "buffer.h"
 #include "export_key.h"
 #include "import_key.h"
 #include "import_wrapped_key.h"
@@ -621,6 +622,7 @@ Return<void> KeymasterDevice::begin(
     request.mutable_blob()->set_blob(&key[0], key.size());
 
     hidl_vec<KeyParameter> params;
+    tag_map_t tag_map;
     if (translate_auth_token(
             authToken, request.mutable_auth_token()) != ErrorCode::OK) {
         _hidl_cb(ErrorCode::INVALID_ARGUMENT, params,
@@ -633,8 +635,46 @@ Return<void> KeymasterDevice::begin(
                response.handle().handle());
       return Void();
     }
+    if (hidl_params_to_map(inParams, &tag_map) != ErrorCode::OK) {
+        _hidl_cb(ErrorCode::INVALID_ARGUMENT, params,
+                 response.handle().handle());
+      return Void();
+    }
 
     KM_CALLV(BeginOperation, hidl_vec<KeyParameter>{}, 0);
+
+    // Setup HAL buffering for this operation's data.
+    Algorithm algorithm;
+    if (translate_algorithm(response.algorithm(), &algorithm) !=
+        ErrorCode::OK) {
+        if (this->abort(response.handle().handle()) != ErrorCode::OK) {
+            LOG(ERROR) << "abort( " << response.handle().handle()
+                       << ") failed";
+        }
+        _hidl_cb(ErrorCode::INVALID_ARGUMENT, params,
+                 response.handle().handle());
+        return Void();
+    }
+    BlockMode blockMode = BlockMode::CBC;             // Just a dummy default.
+    PaddingMode paddingMode = PaddingMode::NONE;      // Just a dummy default.
+    size_t keyBits = 0;                               // Just a dummy default.
+    if (algorithm == Algorithm::AES || algorithm == Algorithm::TRIPLE_DES) {
+        blockMode = tag_map.find(Tag::BLOCK_MODE)->second[0].f.blockMode;
+        paddingMode = tag_map.find(Tag::PADDING)->second[0].f.paddingMode;
+    } else if (algorithm == Algorithm::EC || algorithm == Algorithm::RSA) {
+            keyBits = response.key_bits();
+    }
+    ErrorCode error_code = buffer_begin(response.handle().handle(), algorithm,
+                                        blockMode, paddingMode, keyBits);
+    if (error_code != ErrorCode::OK) {
+        if (this->abort(response.handle().handle()) != ErrorCode::OK) {
+            LOG(ERROR) << "abort( " << response.handle().handle()
+                       << ") failed";
+        }
+        _hidl_cb(ErrorCode::UNKNOWN_ERROR, params,
+                 response.handle().handle());
+        return Void();
+    }
 
     pb_to_hidl_params(response.params(), &params);
 
@@ -656,6 +696,7 @@ Return<void> KeymasterDevice::update(
     UpdateOperationRequest request;
     UpdateOperationResponse response;
 
+    // TODO: does keystore chunk stream data?  To what quantum?
     if (input.size() > KM_MAX_PROTO_FIELD_SIZE) {
         LOG(ERROR) << "Excess input length: " << input.size()
                    << "max allowed: " << KM_MAX_PROTO_FIELD_SIZE;
@@ -668,17 +709,38 @@ Return<void> KeymasterDevice::update(
         return Void();
     }
 
+    uint32_t consumed;
+    hidl_vec<uint8_t> output;
+    hidl_vec<KeyParameter> params;
+    ErrorCode error_code;
+    error_code = buffer_append(operationHandle, input, &consumed);
+    if (error_code != ErrorCode::OK) {
+        _hidl_cb(error_code, 0, params, output);
+        return Void();
+    }
+
+    hidl_vec<uint8_t> blocks;
+    error_code = buffer_read(operationHandle, &blocks);
+    if (error_code != ErrorCode::OK) {
+        _hidl_cb(error_code, 0, params, output);
+        return Void();
+    }
+
+    if (blocks.size() == 0) {
+        // Insufficient data available to proceed.
+        _hidl_cb(ErrorCode::OK, consumed, params, output);
+        return Void();
+    }
+
     request.mutable_handle()->set_handle(operationHandle);
 
-    hidl_vec<KeyParameter> params;
-    hidl_vec<uint8_t> output;
     if (hidl_params_to_pb(
             inParams, request.mutable_params()) != ErrorCode::OK) {
       _hidl_cb(ErrorCode::INVALID_ARGUMENT, 0, params, output);
       return Void();
     }
 
-    request.set_input(&input[0], input.size());
+    request.set_input(&blocks[0], blocks.size());
     if (translate_auth_token(
             authToken, request.mutable_auth_token()) != ErrorCode::OK) {
         _hidl_cb(ErrorCode::INVALID_ARGUMENT, 0, params, output);
@@ -694,7 +756,7 @@ Return<void> KeymasterDevice::update(
         reinterpret_cast<uint8_t*>(const_cast<char*>(response.output().data())),
         response.output().size(), false);
 
-    _hidl_cb(ErrorCode::OK, response.consumed(), params, output);
+    _hidl_cb(ErrorCode::OK, consumed, params, output);
     return Void();
 }
 
@@ -724,6 +786,23 @@ Return<void> KeymasterDevice::finish(
         return Void();
     }
 
+    uint32_t consumed;
+    ErrorCode error_code;
+    error_code = buffer_append(operationHandle, input, &consumed);
+    if (error_code != ErrorCode::OK) {
+        _hidl_cb(error_code,
+                 hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
+        return Void();
+    }
+
+    hidl_vec<uint8_t> data;
+    error_code = buffer_final(operationHandle, &data);
+    if (error_code != ErrorCode::OK) {
+        _hidl_cb(error_code,
+                 hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
+        return Void();
+    }
+
     request.mutable_handle()->set_handle(operationHandle);
 
     hidl_vec<KeyParameter> params;
@@ -734,7 +813,7 @@ Return<void> KeymasterDevice::finish(
       return Void();
     }
 
-    request.set_input(&input[0], input.size());
+    request.set_input(&data[0], data.size());
     request.set_signature(&signature[0], signature.size());
 
     if (translate_auth_token(
