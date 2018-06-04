@@ -126,9 +126,11 @@ void TryEnablingCitadelUpdate(NuggetClientInterface& client, const nugget_app_pa
 
     msg->password = password;
     msg->which_headers = NUGGET_ENABLE_HEADER_RW | NUGGET_ENABLE_HEADER_RO;
+    std::vector<uint8_t> reply;
+    reply.reserve(1);
     const uint32_t appStatus = client.CallApp(APP_ID_NUGGET,
                                               NUGGET_PARAM_ENABLE_UPDATE,
-                                              buffer, nullptr);
+                                              buffer, &reply);
     if (appStatus == APP_ERROR_BOGUS_ARGS) {
         LOG(ERROR) << "Incorrect Citadel update password";
         return;
@@ -139,8 +141,11 @@ void TryEnablingCitadelUpdate(NuggetClientInterface& client, const nugget_app_pa
         return;
     }
 
-    // Reboot for the update to take effect
-    RebootCitadel(client);
+    // If the header[s] changed, reboot for the update to take effect
+    if (reply[1]) {
+      LOG(INFO) << "Update password enabled a new image; rebooting Citadel";
+      RebootCitadel(client);
+    }
 }
 
 } // namespace
