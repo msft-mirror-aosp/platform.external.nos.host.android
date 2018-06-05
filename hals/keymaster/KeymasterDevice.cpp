@@ -656,16 +656,11 @@ Return<void> KeymasterDevice::begin(
         return Void();
     }
     BlockMode blockMode = BlockMode::CBC;             // Just a dummy default.
-    PaddingMode paddingMode = PaddingMode::NONE;      // Just a dummy default.
-    size_t keyBits = 0;                               // Just a dummy default.
     if (algorithm == Algorithm::AES || algorithm == Algorithm::TRIPLE_DES) {
         blockMode = tag_map.find(Tag::BLOCK_MODE)->second[0].f.blockMode;
-        paddingMode = tag_map.find(Tag::PADDING)->second[0].f.paddingMode;
-    } else if (algorithm == Algorithm::EC || algorithm == Algorithm::RSA) {
-            keyBits = response.key_bits();
     }
     ErrorCode error_code = buffer_begin(response.handle().handle(), algorithm,
-                                        blockMode, paddingMode, keyBits);
+                                        blockMode);
     if (error_code != ErrorCode::OK) {
         if (this->abort(response.handle().handle()) != ErrorCode::OK) {
             LOG(ERROR) << "abort( " << response.handle().handle()
@@ -720,7 +715,7 @@ Return<void> KeymasterDevice::update(
     }
 
     hidl_vec<uint8_t> blocks;
-    error_code = buffer_read(operationHandle, &blocks);
+    error_code = buffer_peek(operationHandle, &blocks);
     if (error_code != ErrorCode::OK) {
         _hidl_cb(error_code, 0, params, output);
         return Void();
@@ -750,6 +745,11 @@ Return<void> KeymasterDevice::update(
                                  request.mutable_verification_token());
 
     KM_CALLV(UpdateOperation, 0, hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
+
+    if (buffer_advance(operationHandle, response.consumed()) != ErrorCode::OK) {
+        _hidl_cb(ErrorCode::UNKNOWN_ERROR, 0, params, output);
+        return Void();
+    }
 
     pb_to_hidl_params(response.params(), &params);
     output.setToExternal(
