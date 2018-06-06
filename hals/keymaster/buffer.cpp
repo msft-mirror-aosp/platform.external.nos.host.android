@@ -34,12 +34,13 @@ namespace keymaster {
 using ::android::hardware::keymaster::V4_0::Algorithm;
 using ::android::hardware::keymaster::V4_0::BlockMode;
 using ::android::hardware::keymaster::V4_0::ErrorCode;
-using ::android::hardware::keymaster::V4_0::PaddingMode;
 
 // std
 using std::map;
 using std::pair;
 using std::vector;
+
+static const size_t kMaxChunkSize = 256;
 
 class Operation {
 public:
@@ -53,16 +54,14 @@ public:
         case Algorithm::TRIPLE_DES:
             _blockSize = 8;
             break;
+        case Algorithm::RSA:
+        case Algorithm::EC:
         case Algorithm::HMAC:
-            _blockSize = 1;
+            _blockSize = 0;
         default:
             break;
         }
     }
-    Operation(uint64_t handle, Algorithm algorithm,
-              PaddingMode paddingMode, size_t keyBits) :
-        _handle(handle), _algorithm(algorithm),
-        _paddingMode(paddingMode), _blockSize(keyBits / 8) { }
 
     size_t remaining() const {
         return _buffer.size();
@@ -73,18 +72,33 @@ public:
         *consumed = input.size();
     }
 
-    void read(hidl_vec<uint8_t> *data) {
+    void peek(hidl_vec<uint8_t> *data) {
         // Retain at least one full block; this is done so that when
-        // in GCM mode, the tag will be available to be consumed by
-        // final().
+        // either GCM mode or PKCS7 padding are in use, the last block
+        // will be available to be consumed by final().
         if (_buffer.size() <= _blockSize) {
             *data = vector<uint8_t>();
             return;
         }
-        size_t retain = (_buffer.size() % _blockSize) + _blockSize;
-        const size_t count = _buffer.size() - retain;
+
+        size_t retain;
+        if (_blockSize == 0) {
+            retain = 0;
+        } else {
+            retain = (_buffer.size() % _blockSize) + _blockSize;
+        }
+        const size_t count = std::min(_buffer.size() - retain, kMaxChunkSize);
         *data = vector<uint8_t>(_buffer.begin(), _buffer.begin() + count);
+    }
+
+    ErrorCode advance(size_t count) {
+        if (count > _buffer.size()) {
+            LOG(ERROR) << "Attempt to advance " << count
+                       << " bytes, where occupancy is " << _buffer.size();
+            return ErrorCode::UNKNOWN_ERROR;
+        }
         _buffer.erase(_buffer.begin(), _buffer.begin() + count);
+        return ErrorCode::OK;
     }
 
     void final(hidl_vec<uint8_t> *data) {
@@ -98,7 +112,6 @@ private:
     uint64_t _handle;
     Algorithm _algorithm;
     BlockMode _blockMode;
-    PaddingMode _paddingMode;
     size_t _blockSize;
     vector<uint8_t> _buffer;
 };
@@ -107,8 +120,7 @@ static map<uint64_t, Operation>  buffer_map;
 typedef map<uint64_t, Operation>::iterator  buffer_item;
 
 ErrorCode buffer_begin(uint64_t handle, Algorithm algorithm,
-                       BlockMode blockMode, PaddingMode paddingMode,
-                       size_t keyBits)
+                       BlockMode blockMode)
 {
     if (buffer_map.find(handle) != buffer_map.end()) {
         LOG(ERROR) << "Duplicate operation handle " << handle
@@ -118,16 +130,9 @@ ErrorCode buffer_begin(uint64_t handle, Algorithm algorithm,
         return ErrorCode::UNKNOWN_ERROR;
     }
 
-    if (algorithm == Algorithm::AES || algorithm == Algorithm::TRIPLE_DES ||
-        algorithm == Algorithm::HMAC) {
-        buffer_map.insert(
-            pair<uint64_t, Operation>(
-                handle, Operation(handle, algorithm, blockMode)));
-    } else if (algorithm == Algorithm::EC || algorithm == Algorithm::RSA) {
-        buffer_map.insert(
-            pair<uint64_t, Operation>(handle, Operation(handle, algorithm,
-                                                        paddingMode, keyBits)));
-    }
+    buffer_map.insert(
+        pair<uint64_t, Operation>(
+            handle, Operation(handle, algorithm, blockMode)));
     return ErrorCode::OK;
 }
 
@@ -155,8 +160,8 @@ ErrorCode buffer_append(uint64_t handle,
     return ErrorCode::OK;
 }
 
-ErrorCode buffer_read(uint64_t handle,
-                         hidl_vec<uint8_t> *data)
+ErrorCode buffer_peek(uint64_t handle,
+                      hidl_vec<uint8_t> *data)
 {
     if (buffer_map.find(handle) == buffer_map.end()) {
         LOG(ERROR) << "Read requested on absent operation: " << handle;
@@ -164,8 +169,19 @@ ErrorCode buffer_read(uint64_t handle,
     }
 
     Operation *op = &buffer_map.find(handle)->second;
-    op->read(data);
+    op->peek(data);
     return ErrorCode::OK;
+}
+
+ErrorCode buffer_advance(uint64_t handle, size_t count)
+{
+    if (buffer_map.find(handle) == buffer_map.end()) {
+        LOG(ERROR) << "Read requested on absent operation: " << handle;
+        return ErrorCode::UNKNOWN_ERROR;
+    }
+
+    Operation *op = &buffer_map.find(handle)->second;
+    return op->advance(count);
 }
 
 ErrorCode buffer_final(uint64_t handle,
