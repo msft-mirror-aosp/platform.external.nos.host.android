@@ -61,10 +61,24 @@ uint32_t ExtractVersion(const std::string& version, size_t* loc) {
     uint32_t value = 0;
     size_t new_loc = version.find('.', *loc);
     if (new_loc == std::string::npos) {
-        value = std::stoi(DigitsOnly(version.substr(*loc)));
+        auto sanitized = DigitsOnly(version.substr(*loc));
+        if (!sanitized.empty()) {
+            if (sanitized.size() < version.size() - *loc) {
+                LOG(ERROR) << "Unexpected version format: \"" << version
+                           << "\"";
+            }
+            value = std::stoi(sanitized);
+        }
         *loc = new_loc;
     } else {
-        value = std::stoi(DigitsOnly(version.substr(*loc, new_loc - *loc)));
+        auto sanitized = DigitsOnly(version.substr(*loc, new_loc - *loc));
+        if (!sanitized.empty()) {
+            if (sanitized.size() < new_loc - *loc) {
+                LOG(ERROR) << "Unexpected version format: \"" << version
+                           << "\"";
+            }
+            value = std::stoi(sanitized);
+        }
         *loc = new_loc + 1;
     }
     return value;
@@ -94,6 +108,8 @@ uint32_t DateCodeToUint32(const std::string& code, bool include_day) {
         if (include_day) {
             return_value *= 100;
         }
+    } else {
+        LOG(ERROR) << "Unexpected patchset format: \"" << code << "\"";
     }
     return return_value;
 }
