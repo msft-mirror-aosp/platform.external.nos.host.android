@@ -708,12 +708,7 @@ Return<void> KeymasterDevice::begin(
                  response.handle().handle());
         return Void();
     }
-    BlockMode blockMode = BlockMode::CBC;             // Just a dummy default.
-    if (algorithm == Algorithm::AES || algorithm == Algorithm::TRIPLE_DES) {
-        blockMode = tag_map.find(Tag::BLOCK_MODE)->second[0].f.blockMode;
-    }
-    ErrorCode error_code = buffer_begin(response.handle().handle(), algorithm,
-                                        blockMode);
+    ErrorCode error_code = buffer_begin(response.handle().handle(), algorithm);
     if (error_code != ErrorCode::OK) {
         if (this->abort(response.handle().handle()) != ErrorCode::OK) {
             LOG(ERROR) << "abort( " << response.handle().handle()

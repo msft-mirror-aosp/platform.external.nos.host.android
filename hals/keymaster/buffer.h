@@ -29,12 +29,10 @@ namespace keymaster {
 
 // HAL
 using ::android::hardware::keymaster::V4_0::Algorithm;
-using ::android::hardware::keymaster::V4_0::BlockMode;
 using ::android::hardware::keymaster::V4_0::ErrorCode;
 
 size_t buffer_remaining(uint64_t handle);
-ErrorCode buffer_begin(uint64_t handle, Algorithm algorithm,
-                       BlockMode blockMode);
+ErrorCode buffer_begin(uint64_t handle, Algorithm algorithm);
 ErrorCode buffer_append(uint64_t handle,
                         const hidl_vec<uint8_t>& input,
                         uint32_t *consumed);

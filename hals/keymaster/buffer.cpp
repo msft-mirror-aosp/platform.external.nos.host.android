@@ -32,7 +32,6 @@ namespace keymaster {
 
 // HAL
 using ::android::hardware::keymaster::V4_0::Algorithm;
-using ::android::hardware::keymaster::V4_0::BlockMode;
 using ::android::hardware::keymaster::V4_0::ErrorCode;
 
 // std
@@ -44,9 +43,7 @@ static const size_t kMaxChunkSize = 256;
 
 class Operation {
 public:
-    Operation(uint64_t handle, Algorithm algorithm, BlockMode blockMode) :
-        _handle(handle), _algorithm(algorithm), _blockMode(blockMode),
-        _buffer{} {
+    Operation(Algorithm algorithm) : _algorithm(algorithm), _buffer{} {
         switch (_algorithm) {
         case Algorithm::AES:
             _blockSize = 16;
@@ -109,9 +106,7 @@ public:
     }
 
 private:
-    uint64_t _handle;
     Algorithm _algorithm;
-    BlockMode _blockMode;
     size_t _blockSize;
     vector<uint8_t> _buffer;
 };
@@ -119,8 +114,7 @@ private:
 static map<uint64_t, Operation>  buffer_map;
 typedef map<uint64_t, Operation>::iterator  buffer_item;
 
-ErrorCode buffer_begin(uint64_t handle, Algorithm algorithm,
-                       BlockMode blockMode)
+ErrorCode buffer_begin(uint64_t handle, Algorithm algorithm)
 {
     if (buffer_map.find(handle) != buffer_map.end()) {
         LOG(ERROR) << "Duplicate operation handle " << handle
@@ -131,8 +125,7 @@ ErrorCode buffer_begin(uint64_t handle, Algorithm algorithm,
     }
 
     buffer_map.insert(
-        pair<uint64_t, Operation>(
-            handle, Operation(handle, algorithm, blockMode)));
+        pair<uint64_t, Operation>(handle, Operation(algorithm)));
     return ErrorCode::OK;
 }
 
