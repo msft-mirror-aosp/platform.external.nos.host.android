@@ -29,6 +29,7 @@ namespace hardware {
 namespace keymaster {
 
 // HAL
+using ::android::hardware::keymaster::V4_0::Algorithm;
 using ::android::hardware::keymaster::V4_0::EcCurve;
 using ::android::hardware::keymaster::V4_0::ErrorCode;
 using ::android::hardware::keymaster::V4_0::HardwareAuthToken;
@@ -57,6 +58,8 @@ ErrorCode map_params_to_pb(const tag_map_t& params,
                            nosapp::KeyParameters *pbParams);
 ErrorCode pb_to_hidl_params(const nosapp::KeyParameters& pbParams,
                             hidl_vec<KeyParameter> *params);
+ErrorCode translate_algorithm(nosapp::Algorithm algorithm,
+                              Algorithm *out);
 ErrorCode translate_error_code(nosapp::ErrorCode error_code);
 ErrorCode translate_ec_curve(nosapp::EcCurve ec_curve, EcCurve *out);
 ErrorCode translate_auth_token(const HardwareAuthToken& auth_token,
