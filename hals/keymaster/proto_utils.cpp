@@ -1058,6 +1058,7 @@ ErrorCode translate_error_code(nosapp::ErrorCode error_code)
     case nosapp::ErrorCode::PRODUCTION_MODE_PROVISIONING:
     case nosapp::ErrorCode::ErrorCode_INT_MIN_SENTINEL_DO_NOT_USE_:
     case nosapp::ErrorCode::ErrorCode_INT_MAX_SENTINEL_DO_NOT_USE_:
+    default:
         LOG(ERROR) << "Unrecognized error_code: " << error_code;
         return ErrorCode::UNKNOWN_ERROR;
     }
