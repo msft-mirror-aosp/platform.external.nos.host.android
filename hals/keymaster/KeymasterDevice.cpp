@@ -743,7 +743,7 @@ Return<void> KeymasterDevice::update(
     // TODO: does keystore chunk stream data?  To what quantum?
     if (input.size() > KM_MAX_PROTO_FIELD_SIZE) {
         LOG(ERROR) << "Excess input length: " << input.size()
-                   << "max allowed: " << KM_MAX_PROTO_FIELD_SIZE;
+                   << " max allowed: " << KM_MAX_PROTO_FIELD_SIZE;
         if (this->abort(operationHandle) != ErrorCode::OK) {
             LOG(ERROR) << "abort( " << operationHandle
                        << ") failed";
@@ -826,7 +826,7 @@ Return<void> KeymasterDevice::finish(
 
     if (input.size() > KM_MAX_PROTO_FIELD_SIZE) {
         LOG(ERROR) << "Excess input length: " << input.size()
-                   << "max allowed: " << KM_MAX_PROTO_FIELD_SIZE;
+                   << " max allowed: " << KM_MAX_PROTO_FIELD_SIZE;
         if (this->abort(operationHandle) != ErrorCode::OK) {
             LOG(ERROR) << "abort( " << operationHandle
                        << ") failed";
