@@ -15,6 +15,7 @@
  */
 
 #include "KeymasterDevice.h"
+#include "buffer.h"
 #include "export_key.h"
 #include "import_key.h"
 #include "import_wrapped_key.h"
@@ -49,6 +50,48 @@ std::string DigitsOnly(const std::string& code) {
     return filtered_code;
 }
 
+/** Get one version number from a string and move loc to the point after the
+ * next version delimiter.
+ */
+uint32_t ExtractVersion(const std::string& version, size_t* loc) {
+    if (*loc == std::string::npos || *loc >= version.size()) {
+        return 0;
+    }
+
+    uint32_t value = 0;
+    size_t new_loc = version.find('.', *loc);
+    if (new_loc == std::string::npos) {
+        auto sanitized = DigitsOnly(version.substr(*loc));
+        if (!sanitized.empty()) {
+            if (sanitized.size() < version.size() - *loc) {
+                LOG(ERROR) << "Unexpected version format: \"" << version
+                           << "\"";
+            }
+            value = std::stoi(sanitized);
+        }
+        *loc = new_loc;
+    } else {
+        auto sanitized = DigitsOnly(version.substr(*loc, new_loc - *loc));
+        if (!sanitized.empty()) {
+            if (sanitized.size() < new_loc - *loc) {
+                LOG(ERROR) << "Unexpected version format: \"" << version
+                           << "\"";
+            }
+            value = std::stoi(sanitized);
+        }
+        *loc = new_loc + 1;
+    }
+    return value;
+}
+
+uint32_t VersionToUint32(const std::string& version) {
+    size_t loc = 0;
+    uint32_t major = ExtractVersion(version, &loc);
+    uint32_t minor = ExtractVersion(version, &loc);
+    uint32_t subminor = ExtractVersion(version, &loc);
+    return major * 10000 + minor * 100 + subminor;
+}
+
 uint32_t DateCodeToUint32(const std::string& code, bool include_day) {
     // Keep digits only.
     std::string filtered_code = DigitsOnly(code);
@@ -65,6 +108,8 @@ uint32_t DateCodeToUint32(const std::string& code, bool include_day) {
         if (include_day) {
             return_value *= 100;
         }
+    } else {
+        LOG(ERROR) << "Unexpected patchset format: \"" << code << "\"";
     }
     return return_value;
 }
@@ -104,8 +149,12 @@ using ::nugget::app::keymaster::ImportKeyRequest;
 using ::nugget::app::keymaster::ImportKeyResponse;
 using ::nugget::app::keymaster::ExportKeyRequest;
 using ::nugget::app::keymaster::ExportKeyResponse;
-using ::nugget::app::keymaster::AttestKeyRequest;
-using ::nugget::app::keymaster::AttestKeyResponse;
+using ::nugget::app::keymaster::StartAttestKeyRequest;
+using ::nugget::app::keymaster::StartAttestKeyResponse;
+using ::nugget::app::keymaster::ContinueAttestKeyRequest;
+using ::nugget::app::keymaster::ContinueAttestKeyResponse;
+using ::nugget::app::keymaster::FinishAttestKeyRequest;
+using ::nugget::app::keymaster::FinishAttestKeyResponse;
 using ::nugget::app::keymaster::UpgradeKeyRequest;
 using ::nugget::app::keymaster::UpgradeKeyResponse;
 using ::nugget::app::keymaster::DeleteKeyRequest;
@@ -160,7 +209,7 @@ static ErrorCode status_to_error_code(uint32_t status)
     }
 }
 
-#define KM_CALL(meth) {                                                       \
+#define KM_CALL(meth, request, response) {                                    \
     const uint32_t status = _keymaster. meth (request, &response);            \
     const ErrorCode error_code = translate_error_code(response.error_code()); \
     if (status != APP_SUCCESS) {                                              \
@@ -175,7 +224,7 @@ static ErrorCode status_to_error_code(uint32_t status)
     }                                                                         \
 }
 
-#define KM_CALLV(meth, ...) {                                                 \
+#define KM_CALLV(meth, request, response, ...) {                              \
     const uint32_t status = _keymaster. meth (request, &response);            \
     const ErrorCode error_code = translate_error_code(response.error_code()); \
     if (status != APP_SUCCESS) {                                              \
@@ -196,7 +245,7 @@ static ErrorCode status_to_error_code(uint32_t status)
 
 KeymasterDevice::KeymasterDevice(KeymasterClient& keymaster) :
         _keymaster{keymaster} {
-    _os_version = std::stoi(DigitsOnly(GetProperty(PROPERTY_OS_VERSION, "")));
+    _os_version = VersionToUint32(GetProperty(PROPERTY_OS_VERSION, ""));
     _os_patchlevel = DateCodeToUint32(GetProperty(PROPERTY_OS_PATCHLEVEL, ""),
                                      false /* include_day */);
     _vendor_patchlevel = DateCodeToUint32(
@@ -228,7 +277,7 @@ Return<void> KeymasterDevice::getHmacSharingParameters(
     GetHmacSharingParametersResponse response;
     HmacSharingParameters result;
 
-    KM_CALLV(GetHmacSharingParameters, result);
+    KM_CALLV(GetHmacSharingParameters, request, response, result);
 
     ErrorCode ec = translate_error_code(response.error_code());
 
@@ -286,7 +335,7 @@ Return<void> KeymasterDevice::computeSharedHmac(
                 param.seed.size());
     }
 
-    KM_CALLV(ComputeSharedHmac, result);
+    KM_CALLV(ComputeSharedHmac, request, response, result);
 
     ErrorCode ec = translate_error_code(response.error_code());
 
@@ -334,7 +383,7 @@ Return<ErrorCode> KeymasterDevice::addRngEntropy(const hidl_vec<uint8_t>& data)
         request.set_data(&data[i], std::min(chunk_size, data.size() - i));
 
         // Call device.
-        KM_CALL(AddRngEntropy);
+        KM_CALL(AddRngEntropy, request, response);
     }
 
     return ErrorCode::OK;
@@ -358,7 +407,8 @@ Return<void> KeymasterDevice::generateKey(
     }
 
     // Call device.
-    KM_CALLV(GenerateKey, hidl_vec<uint8_t>{}, KeyCharacteristics());
+    KM_CALLV(GenerateKey, request, response,
+             hidl_vec<uint8_t>{}, KeyCharacteristics());
 
     blob.setToExternal(
         reinterpret_cast<uint8_t*>(
@@ -390,7 +440,7 @@ Return<void> KeymasterDevice::getKeyCharacteristics(
     request.set_app_data(&appData[0], appData.size());
 
     // Call device.
-    KM_CALLV(GetKeyCharacteristics, KeyCharacteristics());
+    KM_CALLV(GetKeyCharacteristics, request, response, KeyCharacteristics());
 
     KeyCharacteristics characteristics;
     pb_to_hidl_params(response.characteristics().software_enforced(),
@@ -420,7 +470,8 @@ Return<void> KeymasterDevice::importKey(
         return Void();
     }
 
-    KM_CALLV(ImportKey, hidl_vec<uint8_t>{}, KeyCharacteristics{});
+    KM_CALLV(ImportKey, request, response,
+             hidl_vec<uint8_t>{}, KeyCharacteristics{});
 
     hidl_vec<uint8_t> blob;
     blob.setToExternal(
@@ -459,7 +510,7 @@ Return<void> KeymasterDevice::exportKey(
     request.set_client_id(&clientId[0], clientId.size());
     request.set_app_data(&appData[0], appData.size());
 
-    KM_CALLV(ExportKey, hidl_vec<uint8_t>{});
+    KM_CALLV(ExportKey, request, response, hidl_vec<uint8_t>{});
 
     ErrorCode error_code = translate_error_code(response.error_code());
     if (error_code != ErrorCode::OK) {
@@ -480,32 +531,63 @@ Return<void> KeymasterDevice::attestKey(
 {
     LOG(VERBOSE) << "Running KeymasterDevice::attestKey";
 
-    AttestKeyRequest request;
-    AttestKeyResponse response;
+    StartAttestKeyRequest startRequest;
+    StartAttestKeyResponse startResponse;
 
-    request.mutable_blob()->set_blob(&keyToAttest[0], keyToAttest.size());
+    startRequest.mutable_blob()->set_blob(&keyToAttest[0], keyToAttest.size());
 
     vector<hidl_vec<uint8_t> > chain;
     if (hidl_params_to_pb(
-            attestParams, request.mutable_params()) != ErrorCode::OK) {
+            attestParams, startRequest.mutable_params()) != ErrorCode::OK) {
       _hidl_cb(ErrorCode::INVALID_ARGUMENT, chain);
       return Void();
     }
 
-    KM_CALLV(AttestKey, hidl_vec<hidl_vec<uint8_t> >{});
+    // TODO:
+    // startRequest.set_attestation_app_id_len(
+    //     attestation_app_id_len(attestParams));
 
-    for (int i = 0; i < response.chain().certificates_size(); i++) {
-        hidl_vec<uint8_t> blob;
-        blob.setToExternal(
-            reinterpret_cast<uint8_t*>(
-                const_cast<char*>(
-                    response.chain().certificates(i).data().data())),
-            response.chain().certificates(i).data().size(), false);
-        chain.push_back(blob);
-    }
+    KM_CALLV(StartAttestKey, startRequest, startResponse,
+             hidl_vec<hidl_vec<uint8_t> >{});
 
-    _hidl_cb(translate_error_code(response.error_code()),
-             hidl_vec<hidl_vec<uint8_t> >(chain));
+    uint64_t operationHandle = startResponse.handle().handle();
+    ContinueAttestKeyRequest continueRequest;
+    ContinueAttestKeyResponse continueResponse;
+
+    continueRequest.mutable_handle()->set_handle(operationHandle);
+    // TODO
+    // continueRequest.set_attestation_app_id(
+    //     attestation_app_id(attestParams));
+
+    KM_CALLV(ContinueAttestKey, continueRequest, continueResponse,
+             hidl_vec<hidl_vec<uint8_t> >{});
+
+    FinishAttestKeyRequest finishRequest;
+    FinishAttestKeyResponse finishResponse;
+
+    finishRequest.mutable_handle()->set_handle(operationHandle);
+
+    KM_CALLV(FinishAttestKey, finishRequest, finishResponse,
+             hidl_vec<hidl_vec<uint8_t> >{});
+
+    std::stringstream ss;
+    ss << startResponse.certificate_prologue();
+    ss << continueResponse.certificate_body();
+    ss << finishResponse.certificate_epilogue();
+
+    hidl_vec<uint8_t> attestation_certificate;
+    attestation_certificate.setToExternal(
+        reinterpret_cast<uint8_t*>(
+            const_cast<char*>(ss.str().data())),
+        ss.str().size(), false);
+
+    chain.push_back(attestation_certificate);
+    // TODO:
+    // chain.push_back(intermediate_certificate());
+    // chain.push_back(root_certificate());
+    // verify cert chain
+
+    _hidl_cb(ErrorCode::OK, hidl_vec<hidl_vec<uint8_t> >(chain));
     return Void();
 }
 
@@ -529,7 +611,7 @@ Return<void> KeymasterDevice::upgradeKey(
       return Void();
     }
 
-    KM_CALLV(UpgradeKey, hidl_vec<uint8_t>{});
+    KM_CALLV(UpgradeKey, request, response, hidl_vec<uint8_t>{});
 
     blob.setToExternal(
         reinterpret_cast<uint8_t*>(
@@ -549,7 +631,7 @@ Return<ErrorCode> KeymasterDevice::deleteKey(const hidl_vec<uint8_t>& keyBlob)
 
     request.mutable_blob()->set_blob(&keyBlob[0], keyBlob.size());
 
-    KM_CALL(DeleteKey);
+    KM_CALL(DeleteKey, request, response);
 
     return translate_error_code(response.error_code());
 }
@@ -561,7 +643,7 @@ Return<ErrorCode> KeymasterDevice::deleteAllKeys()
     DeleteAllKeysRequest request;
     DeleteAllKeysResponse response;
 
-    KM_CALL(DeleteAllKeys);
+    KM_CALL(DeleteAllKeys, request, response);
 
     return translate_error_code(response.error_code());
 }
@@ -573,7 +655,7 @@ Return<ErrorCode> KeymasterDevice::destroyAttestationIds()
     DestroyAttestationIdsRequest request;
     DestroyAttestationIdsResponse response;
 
-    KM_CALL(DestroyAttestationIds);
+    KM_CALL(DestroyAttestationIds, request, response);
 
     return translate_error_code(response.error_code());
 }
@@ -593,6 +675,7 @@ Return<void> KeymasterDevice::begin(
     request.mutable_blob()->set_blob(&key[0], key.size());
 
     hidl_vec<KeyParameter> params;
+    tag_map_t tag_map;
     if (translate_auth_token(
             authToken, request.mutable_auth_token()) != ErrorCode::OK) {
         _hidl_cb(ErrorCode::INVALID_ARGUMENT, params,
@@ -605,8 +688,36 @@ Return<void> KeymasterDevice::begin(
                response.handle().handle());
       return Void();
     }
+    if (hidl_params_to_map(inParams, &tag_map) != ErrorCode::OK) {
+        _hidl_cb(ErrorCode::INVALID_ARGUMENT, params,
+                 response.handle().handle());
+      return Void();
+    }
 
-    KM_CALLV(BeginOperation, hidl_vec<KeyParameter>{}, 0);
+    KM_CALLV(BeginOperation, request, response, hidl_vec<KeyParameter>{}, 0);
+
+    // Setup HAL buffering for this operation's data.
+    Algorithm algorithm;
+    if (translate_algorithm(response.algorithm(), &algorithm) !=
+        ErrorCode::OK) {
+        if (this->abort(response.handle().handle()) != ErrorCode::OK) {
+            LOG(ERROR) << "abort( " << response.handle().handle()
+                       << ") failed";
+        }
+        _hidl_cb(ErrorCode::INVALID_ARGUMENT, params,
+                 response.handle().handle());
+        return Void();
+    }
+    ErrorCode error_code = buffer_begin(response.handle().handle(), algorithm);
+    if (error_code != ErrorCode::OK) {
+        if (this->abort(response.handle().handle()) != ErrorCode::OK) {
+            LOG(ERROR) << "abort( " << response.handle().handle()
+                       << ") failed";
+        }
+        _hidl_cb(ErrorCode::UNKNOWN_ERROR, params,
+                 response.handle().handle());
+        return Void();
+    }
 
     pb_to_hidl_params(response.params(), &params);
 
@@ -628,6 +739,7 @@ Return<void> KeymasterDevice::update(
     UpdateOperationRequest request;
     UpdateOperationResponse response;
 
+    // TODO: does keystore chunk stream data?  To what quantum?
     if (input.size() > KM_MAX_PROTO_FIELD_SIZE) {
         LOG(ERROR) << "Excess input length: " << input.size()
                    << "max allowed: " << KM_MAX_PROTO_FIELD_SIZE;
@@ -640,17 +752,38 @@ Return<void> KeymasterDevice::update(
         return Void();
     }
 
+    uint32_t consumed;
+    hidl_vec<uint8_t> output;
+    hidl_vec<KeyParameter> params;
+    ErrorCode error_code;
+    error_code = buffer_append(operationHandle, input, &consumed);
+    if (error_code != ErrorCode::OK) {
+        _hidl_cb(error_code, 0, params, output);
+        return Void();
+    }
+
+    hidl_vec<uint8_t> blocks;
+    error_code = buffer_peek(operationHandle, &blocks);
+    if (error_code != ErrorCode::OK) {
+        _hidl_cb(error_code, 0, params, output);
+        return Void();
+    }
+
+    if (blocks.size() == 0) {
+        // Insufficient data available to proceed.
+        _hidl_cb(ErrorCode::OK, consumed, params, output);
+        return Void();
+    }
+
     request.mutable_handle()->set_handle(operationHandle);
 
-    hidl_vec<KeyParameter> params;
-    hidl_vec<uint8_t> output;
     if (hidl_params_to_pb(
             inParams, request.mutable_params()) != ErrorCode::OK) {
       _hidl_cb(ErrorCode::INVALID_ARGUMENT, 0, params, output);
       return Void();
     }
 
-    request.set_input(&input[0], input.size());
+    request.set_input(&blocks[0], blocks.size());
     if (translate_auth_token(
             authToken, request.mutable_auth_token()) != ErrorCode::OK) {
         _hidl_cb(ErrorCode::INVALID_ARGUMENT, 0, params, output);
@@ -659,14 +792,20 @@ Return<void> KeymasterDevice::update(
     translate_verification_token(verificationToken,
                                  request.mutable_verification_token());
 
-    KM_CALLV(UpdateOperation, 0, hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
+    KM_CALLV(UpdateOperation, request, response,
+             0, hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
+
+    if (buffer_advance(operationHandle, response.consumed()) != ErrorCode::OK) {
+        _hidl_cb(ErrorCode::UNKNOWN_ERROR, 0, params, output);
+        return Void();
+    }
 
     pb_to_hidl_params(response.params(), &params);
     output.setToExternal(
         reinterpret_cast<uint8_t*>(const_cast<char*>(response.output().data())),
         response.output().size(), false);
 
-    _hidl_cb(ErrorCode::OK, response.consumed(), params, output);
+    _hidl_cb(ErrorCode::OK, consumed, params, output);
     return Void();
 }
 
@@ -696,6 +835,23 @@ Return<void> KeymasterDevice::finish(
         return Void();
     }
 
+    uint32_t consumed;
+    ErrorCode error_code;
+    error_code = buffer_append(operationHandle, input, &consumed);
+    if (error_code != ErrorCode::OK) {
+        _hidl_cb(error_code,
+                 hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
+        return Void();
+    }
+
+    hidl_vec<uint8_t> data;
+    error_code = buffer_final(operationHandle, &data);
+    if (error_code != ErrorCode::OK) {
+        _hidl_cb(error_code,
+                 hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
+        return Void();
+    }
+
     request.mutable_handle()->set_handle(operationHandle);
 
     hidl_vec<KeyParameter> params;
@@ -706,7 +862,7 @@ Return<void> KeymasterDevice::finish(
       return Void();
     }
 
-    request.set_input(&input[0], input.size());
+    request.set_input(&data[0], data.size());
     request.set_signature(&signature[0], signature.size());
 
     if (translate_auth_token(
@@ -717,7 +873,8 @@ Return<void> KeymasterDevice::finish(
     translate_verification_token(verificationToken,
                                  request.mutable_verification_token());
 
-    KM_CALLV(FinishOperation, hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
+    KM_CALLV(FinishOperation, request, response,
+             hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
 
     pb_to_hidl_params(response.params(), &params);
     output.setToExternal(
@@ -737,7 +894,7 @@ Return<ErrorCode> KeymasterDevice::abort(uint64_t operationHandle)
 
     request.mutable_handle()->set_handle(operationHandle);
 
-    KM_CALL(AbortOperation);
+    KM_CALL(AbortOperation, request, response);
 
     return ErrorCode::OK;
 }
@@ -772,7 +929,8 @@ Return<void> KeymasterDevice::importWrappedKey(
         return Void();
     }
 
-    KM_CALLV(ImportWrappedKey, hidl_vec<uint8_t>{}, KeyCharacteristics{});
+    KM_CALLV(ImportWrappedKey, request, response,
+             hidl_vec<uint8_t>{}, KeyCharacteristics{});
 
     hidl_vec<uint8_t> blob;
     blob.setToExternal(
@@ -807,7 +965,7 @@ Return<ErrorCode> KeymasterDevice::SendSystemVersionInfo() const {
     request.set_system_security_level(_os_patchlevel);
     request.set_vendor_security_level(_vendor_patchlevel);
 
-    KM_CALL(SetSystemVersionInfo);
+    KM_CALL(SetSystemVersionInfo, request, response);
     return ErrorCode::OK;
 }
 
@@ -815,7 +973,7 @@ Return<ErrorCode> KeymasterDevice::GetBootInfo() {
     GetBootInfoRequest request;
     GetBootInfoResponse response;
 
-    KM_CALL(GetBootInfo);
+    KM_CALL(GetBootInfo, request, response);
 
     _is_unlocked = response.is_unlocked();
     _boot_color = response.boot_color();
