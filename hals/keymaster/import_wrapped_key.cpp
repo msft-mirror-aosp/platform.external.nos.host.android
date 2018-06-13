@@ -56,7 +56,10 @@ using parse_asn1_fn = function<ErrorCode(CBS *cbs, Tag tag,
 #define KM_WRAPPER_FORMAT_VERSION    0
 #define KM_WRAPPER_GCM_IV_SIZE       12
 #define KM_WRAPPER_GCM_TAG_SIZE      16
-#define KM_WRAPPER_WRAPPED_KEY_SIZE  32
+#define KM_WRAPPER_WRAPPED_AES_KEY_SIZE  32
+#define KM_WRAPPER_WRAPPED_DES_KEY_SIZE  24
+// TODO: update max once PKCS8 support is introduced.
+#define KM_WRAPPER_WRAPPED_MAX_KEY_SIZE  32
 #define KM_TAG_MASK                  0x0FFFFFFF
 
 // BoringSSL helpers.
@@ -459,13 +462,16 @@ ErrorCode import_wrapped_key_request(const hidl_vec<uint8_t>& wrappedKeyData,
         LOG(ERROR) << "Failed to parse secure key";
         return ErrorCode::INVALID_ARGUMENT;
     }
-    if (CBS_len(&secureKey) != KM_WRAPPER_WRAPPED_KEY_SIZE) {
-        LOG(ERROR) << "Secure key len, expected: "
-                   << KM_WRAPPER_WRAPPED_KEY_SIZE
+
+    // TODO: check that the wrapped key size matches the algorithm.
+    if (CBS_len(&secureKey) > KM_WRAPPER_WRAPPED_MAX_KEY_SIZE) {
+        LOG(ERROR) << "Secure key len exceeded: "
+                   << KM_WRAPPER_WRAPPED_MAX_KEY_SIZE
                    << " got: "
                    << CBS_len(&secureKey);
         return ErrorCode::INVALID_ARGUMENT;
     }
+
     if (!CBS_get_asn1(&child, &tag, CBS_ASN1_OCTETSTRING)) {
         LOG(ERROR) << "Failed to parse gcm tag";
         return ErrorCode::INVALID_ARGUMENT;

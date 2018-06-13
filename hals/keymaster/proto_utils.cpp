@@ -573,6 +573,9 @@ ErrorCode key_parameter_to_pb(const KeyParameter& param,
     case Tag::ALLOW_WHILE_ON_BODY: // (TagType:BOOL | 506)
         pb->set_integer(param.f.boolValue);
         break;
+    case Tag::TRUSTED_CONFIRMATION_REQUIRED: // (TagType:BOOL | 508)
+        pb->set_integer(param.f.boolValue);
+        break;
     case Tag::APPLICATION_ID: // (TagType:BYTES | 601)
         pb->set_blob(&param.blob[0], param.blob.size());
         break;
@@ -611,6 +614,7 @@ ErrorCode key_parameter_to_pb(const KeyParameter& param,
         break;
     case Tag::ASSOCIATED_DATA: // (TagType:BYTES | 1000)
     case Tag::NONCE: // (TagType:BYTES | 1001)
+    case Tag::CONFIRMATION_TOKEN: // (TagType:BYTES | 1005)
         pb->set_blob(&param.blob[0], param.blob.size());
         break;
     case Tag::MAC_LENGTH: // (TagType:UINT | 1003)
@@ -731,6 +735,9 @@ ErrorCode pb_to_key_parameter(const nosapp::KeyParameter& param,
     case nosapp::Tag::ALLOW_WHILE_ON_BODY: // (TagType:BOOL | 506)
         kp->f.boolValue = (bool)param.integer();
         break;
+    case nosapp::Tag::TRUSTED_CONFIRMATION_REQUIRED: // (TagType:BOOL | 508)
+        kp->f.boolValue = (bool)param.integer();
+        break;
     case nosapp::Tag::APPLICATION_ID: // (TagType:BYTES | 601)
         kp->blob.setToExternal(
             reinterpret_cast<uint8_t *>(
@@ -790,6 +797,11 @@ ErrorCode pb_to_key_parameter(const nosapp::KeyParameter& param,
         break;
     case nosapp::Tag::RESET_SINCE_ID_ROTATION: // (TagType:BOOL | 1004)
         kp->f.boolValue = (bool)param.integer();
+        break;
+    case nosapp::Tag::CONFIRMATION_TOKEN: // (TagType:BOOL | 1005)
+        kp->blob.setToExternal(
+            reinterpret_cast<uint8_t *>(
+                const_cast<char *>(param.blob().data())), param.blob().size());
         break;
     default:
         return ErrorCode::UNKNOWN_ERROR;
@@ -1038,12 +1050,15 @@ ErrorCode translate_error_code(nosapp::ErrorCode error_code)
         return ErrorCode::CONCURRENT_PROOF_OF_PRESENCE_REQUESTED;
     case nosapp::ErrorCode::UNKNOWN_ERROR:
         return ErrorCode::UNKNOWN_ERROR;
+    case nosapp::ErrorCode::NO_USER_CONFIRMATION:
+        return ErrorCode::NO_USER_CONFIRMATION;
 
     /* Private error codes, unused by HAL. */
     case nosapp::ErrorCode::INVALID_DEVICE_IDS:
     case nosapp::ErrorCode::PRODUCTION_MODE_PROVISIONING:
     case nosapp::ErrorCode::ErrorCode_INT_MIN_SENTINEL_DO_NOT_USE_:
     case nosapp::ErrorCode::ErrorCode_INT_MAX_SENTINEL_DO_NOT_USE_:
+    default:
         LOG(ERROR) << "Unrecognized error_code: " << error_code;
         return ErrorCode::UNKNOWN_ERROR;
     }
