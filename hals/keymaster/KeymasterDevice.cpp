@@ -512,13 +512,14 @@ Return<void> KeymasterDevice::exportKey(
 
     KM_CALLV(ExportKey, request, response, hidl_vec<uint8_t>{});
 
-    ErrorCode error_code = translate_error_code(response.error_code());
-    if (error_code != ErrorCode::OK) {
-        _hidl_cb(error_code, hidl_vec<uint8_t>{});
-    }
-
     hidl_vec<uint8_t> der;
-    error_code = export_key_der(response, &der);
+    ErrorCode error_code = export_key_der(response, &der);
+    if (error_code != ErrorCode::OK) {
+        LOG(ERROR) << "KeymasterDevice::exportKey: DER conversion failed: "
+                   << error_code;
+        _hidl_cb(error_code, hidl_vec<uint8_t>{});
+        return Void();
+    }
 
     _hidl_cb(error_code, der);
     return Void();
@@ -742,7 +743,7 @@ Return<void> KeymasterDevice::update(
     // TODO: does keystore chunk stream data?  To what quantum?
     if (input.size() > KM_MAX_PROTO_FIELD_SIZE) {
         LOG(ERROR) << "Excess input length: " << input.size()
-                   << "max allowed: " << KM_MAX_PROTO_FIELD_SIZE;
+                   << " max allowed: " << KM_MAX_PROTO_FIELD_SIZE;
         if (this->abort(operationHandle) != ErrorCode::OK) {
             LOG(ERROR) << "abort( " << operationHandle
                        << ") failed";
@@ -825,7 +826,7 @@ Return<void> KeymasterDevice::finish(
 
     if (input.size() > KM_MAX_PROTO_FIELD_SIZE) {
         LOG(ERROR) << "Excess input length: " << input.size()
-                   << "max allowed: " << KM_MAX_PROTO_FIELD_SIZE;
+                   << " max allowed: " << KM_MAX_PROTO_FIELD_SIZE;
         if (this->abort(operationHandle) != ErrorCode::OK) {
             LOG(ERROR) << "abort( " << operationHandle
                        << ") failed";
