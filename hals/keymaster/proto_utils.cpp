@@ -573,6 +573,9 @@ ErrorCode key_parameter_to_pb(const KeyParameter& param,
     case Tag::ALLOW_WHILE_ON_BODY: // (TagType:BOOL | 506)
         pb->set_integer(param.f.boolValue);
         break;
+    case Tag::TRUSTED_USER_PRESENCE_REQUIRED: // (TagType:BOOL | 507)
+        pb->set_integer(param.f.boolValue);
+        break;
     case Tag::TRUSTED_CONFIRMATION_REQUIRED: // (TagType:BOOL | 508)
         pb->set_integer(param.f.boolValue);
         break;
@@ -733,6 +736,9 @@ ErrorCode pb_to_key_parameter(const nosapp::KeyParameter& param,
         kp->f.integer = param.integer();
         break;
     case nosapp::Tag::ALLOW_WHILE_ON_BODY: // (TagType:BOOL | 506)
+        kp->f.boolValue = (bool)param.integer();
+        break;
+    case nosapp::Tag::TRUSTED_USER_PRESENCE_REQUIRED: // (TagType:BOOL | 507)
         kp->f.boolValue = (bool)param.integer();
         break;
     case nosapp::Tag::TRUSTED_CONFIRMATION_REQUIRED: // (TagType:BOOL | 508)
