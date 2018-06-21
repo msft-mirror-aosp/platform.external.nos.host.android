@@ -365,47 +365,6 @@ static ErrorCode translate_key_blob_usage_requirements(
     return ErrorCode::UNKNOWN_ERROR;
 }
 
-static nosapp::HardwareAuthenticatorType translate_hardware_authenticator_type(
-    HardwareAuthenticatorType authenticator_type)
-{
-    switch (authenticator_type) {
-    case HardwareAuthenticatorType::NONE:
-        return nosapp::HardwareAuthenticatorType::AUTH_NONE;
-    case HardwareAuthenticatorType::PASSWORD:
-        return nosapp::HardwareAuthenticatorType::AUTH_PASSWORD;
-    case HardwareAuthenticatorType::FINGERPRINT:
-        return nosapp::HardwareAuthenticatorType::AUTH_FINGERPRINT;
-    case HardwareAuthenticatorType::ANY:
-        return nosapp::HardwareAuthenticatorType::AUTH_ANY;
-    default:
-        return nosapp::HardwareAuthenticatorType::AUTH_MAX;
-    }
-}
-
-static ErrorCode translate_hardware_authenticator_type(
-    nosapp::HardwareAuthenticatorType authenticator_type,
-    HardwareAuthenticatorType *out)
-{
-    switch (authenticator_type) {
-    case nosapp::HardwareAuthenticatorType::AUTH_NONE:
-        *out = HardwareAuthenticatorType::NONE;
-        break;
-    case nosapp::HardwareAuthenticatorType::AUTH_PASSWORD:
-        *out = HardwareAuthenticatorType::PASSWORD;
-        break;
-    case nosapp::HardwareAuthenticatorType::AUTH_FINGERPRINT:
-        *out = HardwareAuthenticatorType::FINGERPRINT;
-        break;
-    case nosapp::HardwareAuthenticatorType::AUTH_ANY:
-        *out = HardwareAuthenticatorType::ANY;
-        break;
-    default:
-        return ErrorCode::UNKNOWN_ERROR;
-    }
-
-    return ErrorCode::OK;
-}
-
 static nosapp::KeyOrigin translate_key_origin(KeyOrigin key_origin)
 {
     switch (key_origin) {
@@ -451,28 +410,7 @@ ErrorCode translate_auth_token(const HardwareAuthToken& auth_token,
     out->set_challenge(auth_token.challenge);
     out->set_user_id(auth_token.userId);
     out->set_authenticator_id(auth_token.authenticatorId);
-
-    switch (auth_token.authenticatorType) {
-    case HardwareAuthenticatorType::NONE:
-        out->set_authenticator_type(
-            nosapp::HardwareAuthenticatorType::AUTH_NONE);
-        break;
-    case HardwareAuthenticatorType::PASSWORD:
-        out->set_authenticator_type(
-            nosapp::HardwareAuthenticatorType::AUTH_PASSWORD);
-        break;
-    case HardwareAuthenticatorType::FINGERPRINT:
-        out->set_authenticator_type(
-            nosapp::HardwareAuthenticatorType::AUTH_FINGERPRINT);
-        break;
-    case HardwareAuthenticatorType::ANY:
-        out->set_authenticator_type(
-            nosapp::HardwareAuthenticatorType::AUTH_ANY);
-        break;
-    default:
-        return ErrorCode::UNKNOWN_ERROR;
-    }
-
+    out->set_authenticator_type((uint32_t)auth_token.authenticatorType);
     out->set_timestamp(auth_token.timestamp);
     out->set_mac(&auth_token.mac[0], auth_token.mac.size());
 
@@ -564,13 +502,17 @@ ErrorCode key_parameter_to_pb(const KeyParameter& param,
         pb->set_integer(param.f.boolValue);
         break;
     case Tag::USER_AUTH_TYPE: // (TagType:ENUM | 504)
-        pb->set_integer((uint32_t)translate_hardware_authenticator_type(
-                            param.f.hardwareAuthenticatorType));
+        // This field is an OR'd bitfield of HAL enum values from
+        // ::android::hardware::keymaster::V4_0::HardwareAuthenticatorType.
+        pb->set_integer((uint32_t)param.f.hardwareAuthenticatorType);
         break;
     case Tag::AUTH_TIMEOUT: // (TagType:UINT | 505)
         pb->set_integer(param.f.integer);
         break;
     case Tag::ALLOW_WHILE_ON_BODY: // (TagType:BOOL | 506)
+        pb->set_integer(param.f.boolValue);
+        break;
+    case Tag::TRUSTED_USER_PRESENCE_REQUIRED: // (TagType:BOOL | 507)
         pb->set_integer(param.f.boolValue);
         break;
     case Tag::TRUSTED_CONFIRMATION_REQUIRED: // (TagType:BOOL | 508)
@@ -723,16 +665,18 @@ ErrorCode pb_to_key_parameter(const nosapp::KeyParameter& param,
         kp->f.boolValue = (bool)param.integer();
         break;
     case nosapp::Tag::USER_AUTH_TYPE: // (TagType:ENUM | 504)
-        if (translate_hardware_authenticator_type(
-                static_cast<nosapp::HardwareAuthenticatorType>(param.integer()),
-                &kp->f.hardwareAuthenticatorType) != ErrorCode::OK) {
-            return ErrorCode::UNKNOWN_ERROR;
-        }
+        // This field is an OR'd bitfield of HAL enum values from
+        // ::android::hardware::keymaster::V4_0::HardwareAuthenticatorType.
+        kp->f.hardwareAuthenticatorType =
+            static_cast<HardwareAuthenticatorType>(param.integer());
         break;
     case nosapp::Tag::AUTH_TIMEOUT: // (TagType:UINT | 505)
         kp->f.integer = param.integer();
         break;
     case nosapp::Tag::ALLOW_WHILE_ON_BODY: // (TagType:BOOL | 506)
+        kp->f.boolValue = (bool)param.integer();
+        break;
+    case nosapp::Tag::TRUSTED_USER_PRESENCE_REQUIRED: // (TagType:BOOL | 507)
         kp->f.boolValue = (bool)param.integer();
         break;
     case nosapp::Tag::TRUSTED_CONFIRMATION_REQUIRED: // (TagType:BOOL | 508)
