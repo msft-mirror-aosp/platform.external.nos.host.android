@@ -17,6 +17,7 @@
 #include "KeymasterDevice.h"
 #include "buffer.h"
 #include "export_key.h"
+#include "certs.h"
 #include "import_key.h"
 #include "import_wrapped_key.h"
 #include "proto_utils.h"
@@ -532,6 +533,47 @@ Return<void> KeymasterDevice::exportKey(
 
 #define ATTESTATION_APPLICATION_ID_MAX_SIZE 1024
 #define UTCTIME_STR_WITH_NUL_SIZE           14
+static size_t integer_size(uint64_t value)
+{
+        size_t octet_count = 1;
+        for (value >>= 8; value; value >>= 8) {
+                octet_count++;
+        }
+        return octet_count;
+}
+static size_t encoded_length_size(size_t length)
+{
+        if (length < 0x80) {
+                return 1;
+        }
+        return integer_size(length) + 1;
+}
+
+static uint8_t *asn1_encode_length(size_t length, const uint8_t *head, uint8_t *tail)
+{
+        if (!tail || tail < head + encoded_length_size(length)) {
+                return NULL;
+        }
+
+        if (length < 0x80) {
+                // Short length case
+                *(--tail) = length;
+        } else {
+                // Encode length
+                uint8_t length_len;
+                uint8_t *orig_tail = tail;
+                do {
+                        *(--tail) = length & 0xFF;
+                        length >>= 8;
+                } while (length);
+
+                // Encode length of length.  Assumes length < pow(128, 127).
+                // Should be good.
+                length_len = (orig_tail - tail);
+                *(--tail) = 0x80 | length_len;
+        }
+        return tail;
+}
 
 Return<void> KeymasterDevice::attestKey(
         const hidl_vec<uint8_t>& keyToAttest,
@@ -624,7 +666,11 @@ Return<void> KeymasterDevice::attestKey(
       _hidl_cb(ErrorCode::INVALID_ARGUMENT, hidl_vec<hidl_vec<uint8_t> >{});
       return Void();
     }
+#ifdef USE_TEST_CERTS
+    startRequest.set_selector(AttestationSelector::ATTEST_TEST);
+#else
     startRequest.set_selector(AttestationSelector::ATTEST_BATCH);
+#endif
     startRequest.set_not_before(not_before_str,
                                 sizeof(not_before_str) - 1);
     startRequest.set_not_after(not_after_str,
@@ -633,6 +679,8 @@ Return<void> KeymasterDevice::attestKey(
     // TODO: as an optimization, avoid sending the
     // ATTESTATION_APPLICATION_ID to Start, since only the length of
     // this field is needed at this stage.
+    // NOTE: citadel adds the AAID to the hash in the prologue for now. So if this
+    // is ever changes the HASH_update call needs to move in the citadel firmware.
 
     KM_CALLV(StartAttestKey, startRequest, startResponse,
              hidl_vec<hidl_vec<uint8_t> >{});
@@ -659,25 +707,103 @@ Return<void> KeymasterDevice::attestKey(
     KM_CALLV(FinishAttestKey, finishRequest, finishResponse,
              hidl_vec<hidl_vec<uint8_t> >{});
 
+    hidl_vec<uint8_t>& attestation_application_id =
+            attest_tag_map[Tag::ATTESTATION_APPLICATION_ID].begin()->blob;
+    size_t cert_len = startResponse.certificate_prologue().size()
+                    + attestation_application_id.size()
+                    + continueResponse.certificate_body().size()
+                    + finishResponse.certificate_epilogue().size();
+
     std::stringstream ss;
+    {
+        char c = 0x30;
+        ss.write(&c, 1); // DER_SEQUENCE | DER_CONSTRUCTED
+
+        uint8_t buffer[10];
+        auto * cert_header = asn1_encode_length(cert_len, buffer, buffer + sizeof(buffer));
+
+        if (cert_header == nullptr) {
+            LOG(ERROR) << "Failed to generate attestation certificate sequence header";
+            _hidl_cb(ErrorCode::UNKNOWN_ERROR, hidl_vec<hidl_vec<uint8_t> >{});
+            return Void();
+        }
+        ss.write(reinterpret_cast<char*>(cert_header), buffer + sizeof(buffer) - cert_header);
+    }
+
     ss << startResponse.certificate_prologue();
+    ss.write(reinterpret_cast<const std::stringstream::char_type*>(
+            attestation_application_id.data()), attestation_application_id.size());
     ss << continueResponse.certificate_body();
     ss << finishResponse.certificate_epilogue();
 
-    hidl_vec<uint8_t> attestation_certificate;
-    attestation_certificate.setToExternal(
-        reinterpret_cast<uint8_t*>(
-            const_cast<char*>(ss.str().data())),
-        ss.str().size(), false);
+    if (!ss) {
+        LOG(ERROR) << "Failed to generate attestation certificate";
+        _hidl_cb(ErrorCode::UNKNOWN_ERROR, hidl_vec<hidl_vec<uint8_t> >{});
+        return Void();
+    }
 
     vector<hidl_vec<uint8_t> > chain;
-    chain.push_back(attestation_certificate);
-    // TODO:
-    // chain.push_back(intermediate_certificate());
-    // chain.push_back(root_certificate());
-    // verify cert chain
+    {
+        hidl_vec<uint8_t> attestation_certificate;
+        attestation_certificate.setToExternal(
+            reinterpret_cast<uint8_t*>(
+                const_cast<char*>(ss.str().data())),
+            ss.str().size(), false);
 
-    _hidl_cb(ErrorCode::OK, hidl_vec<hidl_vec<uint8_t> >(chain));
+
+        chain.push_back(std::move(attestation_certificate));
+
+        hidl_vec<uint8_t> batch_cert;
+        hidl_vec<uint8_t> intermediate_cert;
+        hidl_vec<uint8_t> root;
+
+        for (const KeyParameter &param : characteristics.hardwareEnforced) {
+            if (param.tag == Tag::ALGORITHM) {
+#ifdef USE_TEST_CERTS
+                if (param.f.algorithm == Algorithm::RSA) {
+                    batch_cert.setToExternal(
+                          const_cast<uint8_t*>(TEST_STRONGBOX_BATCH_RSA_X509),
+                                       sizeof(TEST_STRONGBOX_BATCH_RSA_X509));
+                    intermediate_cert.setToExternal(
+                          const_cast<uint8_t*>(TEST_STRONGBOX_BATCH_RSA_INT),
+                                       sizeof(TEST_STRONGBOX_BATCH_RSA_INT));
+                    root.setToExternal(
+                          const_cast<uint8_t*>(TEST_STRONGBOX_BATCH_RSA_ROOT),
+                                       sizeof(TEST_STRONGBOX_BATCH_RSA_ROOT));
+                } else {
+                    batch_cert.setToExternal(
+                          const_cast<uint8_t*>(TEST_STRONGBOX_BATCH_EC_X509),
+                                       sizeof(TEST_STRONGBOX_BATCH_EC_X509));
+                    intermediate_cert.setToExternal(
+                          const_cast<uint8_t*>(TEST_STRONGBOX_BATCH_EC_INT),
+                                       sizeof(TEST_STRONGBOX_BATCH_EC_INT));
+                    root.setToExternal(
+                          const_cast<uint8_t*>(TEST_STRONGBOX_BATCH_EC_ROOT),
+                                       sizeof(TEST_STRONGBOX_BATCH_EC_ROOT));
+                }
+#else
+                if (param.f.algorithm == Algorithm::RSA) {
+                    intermediate_cert.setToExternal(
+                          const_cast<uint8_t*>(prod_rsa_int_cert),
+                                       sizeof(rsa_int_cert));
+                } else {
+                    intermediate_cert.setToExternal(
+                          const_cast<uint8_t*>(prod_ec_int_cert),
+                                       sizeof(ec_int_cert));
+                }
+                root.setToExternal(
+                        const_cast<uint8_t*>(root_cert),
+                        sizeof(prod_root_cert));
+#endif
+            }
+        }
+
+        chain.push_back(std::move(batch_cert));
+        chain.push_back(std::move(intermediate_cert));
+        chain.push_back(std::move(root));
+    }
+
+    _hidl_cb(ErrorCode::OK, chain);
     return Void();
 }
 
