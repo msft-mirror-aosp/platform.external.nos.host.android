@@ -770,11 +770,9 @@ Return<void> KeymasterDevice::update(
         return Void();
     }
 
-    if (blocks.size() == 0) {
-        // Insufficient data available to proceed.
-        _hidl_cb(ErrorCode::OK, consumed, params, output);
-        return Void();
-    }
+    // blocks.size() may be zero, but do a round-trip none-the-less
+    // since this may be GCM, there may be AAD data in params.
+    // TODO: as an optimization, do some inspection apriori.
 
     request.mutable_handle()->set_handle(operationHandle);
 
