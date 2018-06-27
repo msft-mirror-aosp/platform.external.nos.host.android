@@ -17,6 +17,7 @@
 #include "KeymasterDevice.h"
 #include "buffer.h"
 #include "export_key.h"
+#include "certs.h"
 #include "import_key.h"
 #include "import_wrapped_key.h"
 #include "proto_utils.h"
@@ -31,6 +32,8 @@
 #include <android-base/properties.h>
 
 #include <algorithm>
+
+#include <time.h>
 
 namespace android {
 namespace hardware {
@@ -183,6 +186,9 @@ using ::nugget::app::keymaster::GetBootInfoResponse;
 // KM 4.0 types
 using ::nugget::app::keymaster::ImportWrappedKeyRequest;
 namespace nosapp = ::nugget::app::keymaster;
+
+// KM internal types
+using ::nugget::app::keymaster::AttestationSelector;
 
 static ErrorCode status_to_error_code(uint32_t status)
 {
@@ -525,6 +531,50 @@ Return<void> KeymasterDevice::exportKey(
     return Void();
 }
 
+#define ATTESTATION_APPLICATION_ID_MAX_SIZE 1024
+#define UTCTIME_STR_WITH_NUL_SIZE           14
+static size_t integer_size(uint64_t value)
+{
+        size_t octet_count = 1;
+        for (value >>= 8; value; value >>= 8) {
+                octet_count++;
+        }
+        return octet_count;
+}
+static size_t encoded_length_size(size_t length)
+{
+        if (length < 0x80) {
+                return 1;
+        }
+        return integer_size(length) + 1;
+}
+
+static uint8_t *asn1_encode_length(size_t length, const uint8_t *head, uint8_t *tail)
+{
+        if (!tail || tail < head + encoded_length_size(length)) {
+                return NULL;
+        }
+
+        if (length < 0x80) {
+                // Short length case
+                *(--tail) = length;
+        } else {
+                // Encode length
+                uint8_t length_len;
+                uint8_t *orig_tail = tail;
+                do {
+                        *(--tail) = length & 0xFF;
+                        length >>= 8;
+                } while (length);
+
+                // Encode length of length.  Assumes length < pow(128, 127).
+                // Should be good.
+                length_len = (orig_tail - tail);
+                *(--tail) = 0x80 | length_len;
+        }
+        return tail;
+}
+
 Return<void> KeymasterDevice::attestKey(
         const hidl_vec<uint8_t>& keyToAttest,
         const hidl_vec<KeyParameter>& attestParams,
@@ -535,18 +585,102 @@ Return<void> KeymasterDevice::attestKey(
     StartAttestKeyRequest startRequest;
     StartAttestKeyResponse startResponse;
 
-    startRequest.mutable_blob()->set_blob(&keyToAttest[0], keyToAttest.size());
-
-    vector<hidl_vec<uint8_t> > chain;
-    if (hidl_params_to_pb(
-            attestParams, startRequest.mutable_params()) != ErrorCode::OK) {
-      _hidl_cb(ErrorCode::INVALID_ARGUMENT, chain);
+    // Ensure that required parameters are present.
+    tag_map_t attest_tag_map;
+    if (hidl_params_to_map(attestParams, &attest_tag_map) != ErrorCode::OK) {
+        _hidl_cb(ErrorCode::INVALID_ARGUMENT, hidl_vec<hidl_vec<uint8_t> >{});
+      return Void();
+    }
+    if (attest_tag_map.find(Tag::ATTESTATION_APPLICATION_ID) ==
+        attest_tag_map.end()) {
+        _hidl_cb(ErrorCode::ATTESTATION_APPLICATION_ID_MISSING,
+                 hidl_vec<hidl_vec<uint8_t> >{});
       return Void();
     }
 
-    // TODO:
-    // startRequest.set_attestation_app_id_len(
-    //     attestation_app_id_len(attestParams));
+    hidl_vec<uint8_t> client_id;
+    if (attest_tag_map.find(Tag::APPLICATION_ID) != attest_tag_map.end()) {
+        client_id = attest_tag_map.find(Tag::APPLICATION_ID)->second[0].blob;
+    }
+    hidl_vec<uint8_t> app_data;
+    if (attest_tag_map.find(Tag::APPLICATION_DATA) != attest_tag_map.end()) {
+        app_data = attest_tag_map.find(
+            Tag::APPLICATION_DATA)->second[0].blob;
+    }
+
+    GetKeyCharacteristicsRequest charRequest;
+    GetKeyCharacteristicsResponse charResponse;
+
+    charRequest.mutable_blob()->set_blob(&keyToAttest[0], keyToAttest.size());
+    charRequest.set_client_id(&client_id[0], client_id.size());
+    charRequest.set_app_data(&app_data[0], app_data.size());
+
+    // Call device.
+    KM_CALLV(GetKeyCharacteristics, charRequest,
+             charResponse, hidl_vec<hidl_vec<uint8_t> >{});
+
+    KeyCharacteristics characteristics;
+    pb_to_hidl_params(charResponse.characteristics().software_enforced(),
+                      &characteristics.softwareEnforced);
+    pb_to_hidl_params(charResponse.characteristics().tee_enforced(),
+                      &characteristics.hardwareEnforced);
+
+    tag_map_t char_tag_map;
+    if (hidl_params_to_map(characteristics.softwareEnforced,
+                           &attest_tag_map) != ErrorCode::OK) {
+        _hidl_cb(ErrorCode::INVALID_ARGUMENT, hidl_vec<hidl_vec<uint8_t> >{});
+      return Void();
+    }
+
+    time_t not_before = 0;
+    if (char_tag_map.find(Tag::ACTIVE_DATETIME) != char_tag_map.end()) {
+        not_before = char_tag_map.find(
+            Tag::ACTIVE_DATETIME)->second[0].f.dateTime;
+    } else if (char_tag_map.find(Tag::CREATION_DATETIME) !=
+               char_tag_map.end()) {
+        not_before = char_tag_map.find(
+            Tag::CREATION_DATETIME)->second[0].f.dateTime;
+    }
+    // TODO: else: both ACTIVE and CREATION datetime are absent, is
+    // this an error?
+    time_t not_after = 0;
+    if (char_tag_map.find(Tag::USAGE_EXPIRE_DATETIME) != char_tag_map.end()) {
+        not_after = char_tag_map.find(
+            Tag::USAGE_EXPIRE_DATETIME)->second[0].f.dateTime;
+    } else {
+        not_after = 1842739199; // Batch cert expiry date: 2028-05-23:23:59:59.
+    }
+
+    char not_before_str[UTCTIME_STR_WITH_NUL_SIZE] = {};
+    char not_after_str[UTCTIME_STR_WITH_NUL_SIZE] = {};
+    if (::strftime(not_before_str, sizeof(not_before_str),
+                   "%y%m%d%H%M%SZ", gmtime(&not_before)) == 0 ||
+        ::strftime(not_after_str, sizeof(not_after_str),
+                   "%y%m%d%H%M%SZ", gmtime(&not_after)) == 0) {
+        _hidl_cb(ErrorCode::UNKNOWN_ERROR, hidl_vec<hidl_vec<uint8_t> >{});
+    }
+
+    startRequest.mutable_blob()->set_blob(&keyToAttest[0], keyToAttest.size());
+    if (hidl_params_to_pb(
+            attestParams, startRequest.mutable_params()) != ErrorCode::OK) {
+      _hidl_cb(ErrorCode::INVALID_ARGUMENT, hidl_vec<hidl_vec<uint8_t> >{});
+      return Void();
+    }
+#ifdef USE_TEST_CERTS
+    startRequest.set_selector(AttestationSelector::ATTEST_TEST);
+#else
+    startRequest.set_selector(AttestationSelector::ATTEST_BATCH);
+#endif
+    startRequest.set_not_before(not_before_str,
+                                sizeof(not_before_str) - 1);
+    startRequest.set_not_after(not_after_str,
+                                sizeof(not_after_str) - 1);
+
+    // TODO: as an optimization, avoid sending the
+    // ATTESTATION_APPLICATION_ID to Start, since only the length of
+    // this field is needed at this stage.
+    // NOTE: citadel adds the AAID to the hash in the prologue for now. So if this
+    // is ever changes the HASH_update call needs to move in the citadel firmware.
 
     KM_CALLV(StartAttestKey, startRequest, startResponse,
              hidl_vec<hidl_vec<uint8_t> >{});
@@ -556,9 +690,11 @@ Return<void> KeymasterDevice::attestKey(
     ContinueAttestKeyResponse continueResponse;
 
     continueRequest.mutable_handle()->set_handle(operationHandle);
-    // TODO
-    // continueRequest.set_attestation_app_id(
-    //     attestation_app_id(attestParams));
+    if (hidl_params_to_pb(
+            attestParams, continueRequest.mutable_params()) != ErrorCode::OK) {
+      _hidl_cb(ErrorCode::INVALID_ARGUMENT, hidl_vec<hidl_vec<uint8_t> >{});
+      return Void();
+    }
 
     KM_CALLV(ContinueAttestKey, continueRequest, continueResponse,
              hidl_vec<hidl_vec<uint8_t> >{});
@@ -571,24 +707,103 @@ Return<void> KeymasterDevice::attestKey(
     KM_CALLV(FinishAttestKey, finishRequest, finishResponse,
              hidl_vec<hidl_vec<uint8_t> >{});
 
+    hidl_vec<uint8_t>& attestation_application_id =
+            attest_tag_map[Tag::ATTESTATION_APPLICATION_ID].begin()->blob;
+    size_t cert_len = startResponse.certificate_prologue().size()
+                    + attestation_application_id.size()
+                    + continueResponse.certificate_body().size()
+                    + finishResponse.certificate_epilogue().size();
+
     std::stringstream ss;
+    {
+        char c = 0x30;
+        ss.write(&c, 1); // DER_SEQUENCE | DER_CONSTRUCTED
+
+        uint8_t buffer[10];
+        auto * cert_header = asn1_encode_length(cert_len, buffer, buffer + sizeof(buffer));
+
+        if (cert_header == nullptr) {
+            LOG(ERROR) << "Failed to generate attestation certificate sequence header";
+            _hidl_cb(ErrorCode::UNKNOWN_ERROR, hidl_vec<hidl_vec<uint8_t> >{});
+            return Void();
+        }
+        ss.write(reinterpret_cast<char*>(cert_header), buffer + sizeof(buffer) - cert_header);
+    }
+
     ss << startResponse.certificate_prologue();
+    ss.write(reinterpret_cast<const std::stringstream::char_type*>(
+            attestation_application_id.data()), attestation_application_id.size());
     ss << continueResponse.certificate_body();
     ss << finishResponse.certificate_epilogue();
 
-    hidl_vec<uint8_t> attestation_certificate;
-    attestation_certificate.setToExternal(
-        reinterpret_cast<uint8_t*>(
-            const_cast<char*>(ss.str().data())),
-        ss.str().size(), false);
+    if (!ss) {
+        LOG(ERROR) << "Failed to generate attestation certificate";
+        _hidl_cb(ErrorCode::UNKNOWN_ERROR, hidl_vec<hidl_vec<uint8_t> >{});
+        return Void();
+    }
 
-    chain.push_back(attestation_certificate);
-    // TODO:
-    // chain.push_back(intermediate_certificate());
-    // chain.push_back(root_certificate());
-    // verify cert chain
+    vector<hidl_vec<uint8_t> > chain;
+    {
+        hidl_vec<uint8_t> attestation_certificate;
+        attestation_certificate.setToExternal(
+            reinterpret_cast<uint8_t*>(
+                const_cast<char*>(ss.str().data())),
+            ss.str().size(), false);
 
-    _hidl_cb(ErrorCode::OK, hidl_vec<hidl_vec<uint8_t> >(chain));
+
+        chain.push_back(std::move(attestation_certificate));
+
+        hidl_vec<uint8_t> batch_cert;
+        hidl_vec<uint8_t> intermediate_cert;
+        hidl_vec<uint8_t> root;
+
+        for (const KeyParameter &param : characteristics.hardwareEnforced) {
+            if (param.tag == Tag::ALGORITHM) {
+#ifdef USE_TEST_CERTS
+                if (param.f.algorithm == Algorithm::RSA) {
+                    batch_cert.setToExternal(
+                          const_cast<uint8_t*>(TEST_STRONGBOX_BATCH_RSA_X509),
+                                       sizeof(TEST_STRONGBOX_BATCH_RSA_X509));
+                    intermediate_cert.setToExternal(
+                          const_cast<uint8_t*>(TEST_STRONGBOX_BATCH_RSA_INT),
+                                       sizeof(TEST_STRONGBOX_BATCH_RSA_INT));
+                    root.setToExternal(
+                          const_cast<uint8_t*>(TEST_STRONGBOX_BATCH_RSA_ROOT),
+                                       sizeof(TEST_STRONGBOX_BATCH_RSA_ROOT));
+                } else {
+                    batch_cert.setToExternal(
+                          const_cast<uint8_t*>(TEST_STRONGBOX_BATCH_EC_X509),
+                                       sizeof(TEST_STRONGBOX_BATCH_EC_X509));
+                    intermediate_cert.setToExternal(
+                          const_cast<uint8_t*>(TEST_STRONGBOX_BATCH_EC_INT),
+                                       sizeof(TEST_STRONGBOX_BATCH_EC_INT));
+                    root.setToExternal(
+                          const_cast<uint8_t*>(TEST_STRONGBOX_BATCH_EC_ROOT),
+                                       sizeof(TEST_STRONGBOX_BATCH_EC_ROOT));
+                }
+#else
+                if (param.f.algorithm == Algorithm::RSA) {
+                    intermediate_cert.setToExternal(
+                          const_cast<uint8_t*>(prod_rsa_int_cert),
+                                       sizeof(rsa_int_cert));
+                } else {
+                    intermediate_cert.setToExternal(
+                          const_cast<uint8_t*>(prod_ec_int_cert),
+                                       sizeof(ec_int_cert));
+                }
+                root.setToExternal(
+                        const_cast<uint8_t*>(root_cert),
+                        sizeof(prod_root_cert));
+#endif
+            }
+        }
+
+        chain.push_back(std::move(batch_cert));
+        chain.push_back(std::move(intermediate_cert));
+        chain.push_back(std::move(root));
+    }
+
+    _hidl_cb(ErrorCode::OK, chain);
     return Void();
 }
 
@@ -676,7 +891,6 @@ Return<void> KeymasterDevice::begin(
     request.mutable_blob()->set_blob(&key[0], key.size());
 
     hidl_vec<KeyParameter> params;
-    tag_map_t tag_map;
     if (translate_auth_token(
             authToken, request.mutable_auth_token()) != ErrorCode::OK) {
         _hidl_cb(ErrorCode::INVALID_ARGUMENT, params,
@@ -689,6 +903,7 @@ Return<void> KeymasterDevice::begin(
                response.handle().handle());
       return Void();
     }
+    tag_map_t tag_map;
     if (hidl_params_to_map(inParams, &tag_map) != ErrorCode::OK) {
         _hidl_cb(ErrorCode::INVALID_ARGUMENT, params,
                  response.handle().handle());
@@ -770,11 +985,9 @@ Return<void> KeymasterDevice::update(
         return Void();
     }
 
-    if (blocks.size() == 0) {
-        // Insufficient data available to proceed.
-        _hidl_cb(ErrorCode::OK, consumed, params, output);
-        return Void();
-    }
+    // blocks.size() may be zero, but do a round-trip none-the-less
+    // since this may be GCM, there may be AAD data in params.
+    // TODO: as an optimization, do some inspection apriori.
 
     request.mutable_handle()->set_handle(operationHandle);
 
