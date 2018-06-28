@@ -124,6 +124,7 @@ using std::string;
 
 // base
 using ::android::base::GetProperty;
+using ::android::base::WaitForPropertyCreation;
 
 // libhidl
 using ::android::hardware::Void;
@@ -251,6 +252,11 @@ static ErrorCode status_to_error_code(uint32_t status)
 
 KeymasterDevice::KeymasterDevice(KeymasterClient& keymaster) :
         _keymaster{keymaster} {
+    // Block until all of the properties have been created
+    while (!(WaitForPropertyCreation(PROPERTY_OS_VERSION) &&
+             WaitForPropertyCreation(PROPERTY_OS_PATCHLEVEL) &&
+             WaitForPropertyCreation(PROPERTY_VENDOR_PATCHLEVEL))) {}
+
     _os_version = VersionToUint32(GetProperty(PROPERTY_OS_VERSION, ""));
     _os_patchlevel = DateCodeToUint32(GetProperty(PROPERTY_OS_PATCHLEVEL, ""),
                                      false /* include_day */);
