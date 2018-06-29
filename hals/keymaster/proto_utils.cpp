@@ -425,7 +425,8 @@ void translate_verification_token(
     out->set_timestamp(verification_token.timestamp);
     hidl_params_to_pb(verification_token.parametersVerified,
                       out->mutable_params_verified());
-    out->set_security_level(nosapp::SecurityLevel::STRONGBOX);
+    out->set_security_level(static_cast<nosapp::SecurityLevel>(
+                            verification_token.securityLevel));
     out->set_mac(verification_token.mac.data(),
                  verification_token.mac.size());
 }
