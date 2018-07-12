@@ -788,19 +788,47 @@ Return<void> KeymasterDevice::attestKey(
                                        sizeof(TEST_STRONGBOX_BATCH_EC_ROOT));
                 }
 #else
-                if (param.f.algorithm == Algorithm::RSA) {
-                    intermediate_cert.setToExternal(
-                          const_cast<uint8_t*>(prod_rsa_int_cert),
-                                       sizeof(rsa_int_cert));
+                if (false /* use prod certs */) {
+                    if (param.f.algorithm == Algorithm::RSA) {
+                        batch_cert.setToExternal(
+                              const_cast<uint8_t*>(prod_rsa_cert),
+                                                   sizeof(prod_rsa_cert));
+                        intermediate_cert.setToExternal(
+                              const_cast<uint8_t*>(prod_rsa_int_cert),
+                                                   sizeof(prod_rsa_int_cert));
+                    } else {
+                        batch_cert.setToExternal(
+                              const_cast<uint8_t*>(prod_ec_cert),
+                                                   sizeof(prod_ec_cert));
+                        intermediate_cert.setToExternal(
+                              const_cast<uint8_t*>(prod_ec_int_cert),
+                                           sizeof(prod_ec_int_cert));
+                    }
+                    root.setToExternal(
+                            const_cast<uint8_t*>(prod_root_cert),
+                            sizeof(prod_root_cert));
                 } else {
-                    intermediate_cert.setToExternal(
-                          const_cast<uint8_t*>(prod_ec_int_cert),
-                                       sizeof(ec_int_cert));
+                    if (param.f.algorithm == Algorithm::RSA) {
+                        batch_cert.setToExternal(
+                              const_cast<uint8_t*>(dvt_rsa_cert),
+                                                   sizeof(dvt_rsa_cert));
+                        intermediate_cert.setToExternal(
+                              const_cast<uint8_t*>(dvt_rsa_int_cert),
+                                                   sizeof(dvt_rsa_int_cert));
+                    } else {
+                        batch_cert.setToExternal(
+                              const_cast<uint8_t*>(dvt_ec_cert),
+                                                   sizeof(dvt_ec_cert));
+                        intermediate_cert.setToExternal(
+                              const_cast<uint8_t*>(dvt_ec_int_cert),
+                                           sizeof(dvt_ec_int_cert));
+                    }
+                    root.setToExternal(
+                            const_cast<uint8_t*>(dvt_root_cert),
+                            sizeof(dvt_root_cert));
                 }
-                root.setToExternal(
-                        const_cast<uint8_t*>(root_cert),
-                        sizeof(prod_root_cert));
 #endif
+                break; // we found the ALGORITM tag so we can break the loop
             }
         }
 
