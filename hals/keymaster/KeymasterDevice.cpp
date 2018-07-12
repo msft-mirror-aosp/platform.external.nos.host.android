@@ -672,11 +672,13 @@ Return<void> KeymasterDevice::attestKey(
       _hidl_cb(ErrorCode::INVALID_ARGUMENT, hidl_vec<hidl_vec<uint8_t> >{});
       return Void();
     }
-#ifdef USE_TEST_CERTS
-    startRequest.set_selector(AttestationSelector::ATTEST_TEST);
-#else
+
+    // Developer configs (i.e. nodelocked-RO), and PROTO devices will
+    // fall back to TEST certs here, since BATCH certs will be
+    // unavailable.  The selected certificate may be determined via
+    // info included in the response to FinishAttestKeyRequest().
     startRequest.set_selector(AttestationSelector::ATTEST_BATCH);
-#endif
+
     startRequest.set_not_before(not_before_str,
                                 sizeof(not_before_str) - 1);
     startRequest.set_not_after(not_after_str,
@@ -764,72 +766,83 @@ Return<void> KeymasterDevice::attestKey(
         hidl_vec<uint8_t> root;
 
         for (const KeyParameter &param : characteristics.hardwareEnforced) {
-            if (param.tag == Tag::ALGORITHM) {
-#ifdef USE_TEST_CERTS
+            if (param.tag != Tag::ALGORITHM) {
+                continue;
+            }
+
+            // Node-locked RO implies that factory provisioned certs
+            // (if any), are inaccessible, so fallback to the TEST
+            // certs.  Similarly, PROTO chips were not provisioned
+            // with certs, and hence will fallback to TEST certs.
+            if (finishResponse.nodelocked_ro() ||
+                finishResponse.chip_fusing() == nosapp::FUSING_PROTO) {
                 if (param.f.algorithm == Algorithm::RSA) {
                     batch_cert.setToExternal(
-                          const_cast<uint8_t*>(TEST_STRONGBOX_BATCH_RSA_X509),
-                                       sizeof(TEST_STRONGBOX_BATCH_RSA_X509));
+                        const_cast<uint8_t*>(
+                            TEST_STRONGBOX_BATCH_RSA_X509),
+                                      sizeof(TEST_STRONGBOX_BATCH_RSA_X509));
                     intermediate_cert.setToExternal(
-                          const_cast<uint8_t*>(TEST_STRONGBOX_BATCH_RSA_INT),
-                                       sizeof(TEST_STRONGBOX_BATCH_RSA_INT));
+                        const_cast<uint8_t*>(
+                            TEST_STRONGBOX_BATCH_RSA_INT),
+                        sizeof(TEST_STRONGBOX_BATCH_RSA_INT));
                     root.setToExternal(
-                          const_cast<uint8_t*>(TEST_STRONGBOX_BATCH_RSA_ROOT),
-                                       sizeof(TEST_STRONGBOX_BATCH_RSA_ROOT));
+                        const_cast<uint8_t*>(
+                            TEST_STRONGBOX_BATCH_RSA_ROOT),
+                        sizeof(TEST_STRONGBOX_BATCH_RSA_ROOT));
                 } else {
                     batch_cert.setToExternal(
-                          const_cast<uint8_t*>(TEST_STRONGBOX_BATCH_EC_X509),
-                                       sizeof(TEST_STRONGBOX_BATCH_EC_X509));
+                        const_cast<uint8_t*>(
+                            TEST_STRONGBOX_BATCH_EC_X509),
+                        sizeof(TEST_STRONGBOX_BATCH_EC_X509));
                     intermediate_cert.setToExternal(
-                          const_cast<uint8_t*>(TEST_STRONGBOX_BATCH_EC_INT),
-                                       sizeof(TEST_STRONGBOX_BATCH_EC_INT));
+                        const_cast<uint8_t*>(
+                            TEST_STRONGBOX_BATCH_EC_INT),
+                        sizeof(TEST_STRONGBOX_BATCH_EC_INT));
                     root.setToExternal(
-                          const_cast<uint8_t*>(TEST_STRONGBOX_BATCH_EC_ROOT),
-                                       sizeof(TEST_STRONGBOX_BATCH_EC_ROOT));
+                        const_cast<uint8_t*>(
+                            TEST_STRONGBOX_BATCH_EC_ROOT),
+                        sizeof(TEST_STRONGBOX_BATCH_EC_ROOT));
                 }
-#else
-                if (false /* use prod certs */) {
-                    if (param.f.algorithm == Algorithm::RSA) {
-                        batch_cert.setToExternal(
-                              const_cast<uint8_t*>(prod_rsa_cert),
-                                                   sizeof(prod_rsa_cert));
-                        intermediate_cert.setToExternal(
-                              const_cast<uint8_t*>(prod_rsa_int_cert),
-                                                   sizeof(prod_rsa_int_cert));
-                    } else {
-                        batch_cert.setToExternal(
-                              const_cast<uint8_t*>(prod_ec_cert),
-                                                   sizeof(prod_ec_cert));
-                        intermediate_cert.setToExternal(
-                              const_cast<uint8_t*>(prod_ec_int_cert),
-                                           sizeof(prod_ec_int_cert));
-                    }
-                    root.setToExternal(
-                            const_cast<uint8_t*>(prod_root_cert),
-                            sizeof(prod_root_cert));
+            } else if (finishResponse.chip_fusing() == nosapp::FUSING_DVT) {
+                if (param.f.algorithm == Algorithm::RSA) {
+                    batch_cert.setToExternal(
+                        const_cast<uint8_t*>(dvt_rsa_cert),
+                        sizeof(dvt_rsa_cert));
+                    intermediate_cert.setToExternal(
+                        const_cast<uint8_t*>(dvt_rsa_int_cert),
+                        sizeof(dvt_rsa_int_cert));
                 } else {
-                    if (param.f.algorithm == Algorithm::RSA) {
-                        batch_cert.setToExternal(
-                              const_cast<uint8_t*>(dvt_rsa_cert),
-                                                   sizeof(dvt_rsa_cert));
-                        intermediate_cert.setToExternal(
-                              const_cast<uint8_t*>(dvt_rsa_int_cert),
-                                                   sizeof(dvt_rsa_int_cert));
-                    } else {
-                        batch_cert.setToExternal(
-                              const_cast<uint8_t*>(dvt_ec_cert),
-                                                   sizeof(dvt_ec_cert));
-                        intermediate_cert.setToExternal(
-                              const_cast<uint8_t*>(dvt_ec_int_cert),
-                                           sizeof(dvt_ec_int_cert));
-                    }
-                    root.setToExternal(
-                            const_cast<uint8_t*>(dvt_root_cert),
-                            sizeof(dvt_root_cert));
+                    batch_cert.setToExternal(
+                        const_cast<uint8_t*>(dvt_ec_cert),
+                        sizeof(dvt_ec_cert));
+                    intermediate_cert.setToExternal(
+                        const_cast<uint8_t*>(dvt_ec_int_cert),
+                        sizeof(dvt_ec_int_cert));
                 }
-#endif
-                break; // we found the ALGORITM tag so we can break the loop
+                root.setToExternal(
+                    const_cast<uint8_t*>(dvt_root_cert),
+                    sizeof(dvt_root_cert));
+            } else {  // PVT!
+                if (param.f.algorithm == Algorithm::RSA) {
+                    batch_cert.setToExternal(
+                        const_cast<uint8_t*>(prod_rsa_cert),
+                        sizeof(prod_rsa_cert));
+                    intermediate_cert.setToExternal(
+                        const_cast<uint8_t*>(prod_rsa_int_cert),
+                        sizeof(prod_rsa_int_cert));
+                } else {
+                    batch_cert.setToExternal(
+                        const_cast<uint8_t*>(prod_ec_cert),
+                        sizeof(prod_ec_cert));
+                    intermediate_cert.setToExternal(
+                        const_cast<uint8_t*>(prod_ec_int_cert),
+                        sizeof(prod_ec_int_cert));
+                }
+                root.setToExternal(
+                    const_cast<uint8_t*>(prod_root_cert),
+                    sizeof(prod_root_cert));
             }
+            break; // we found the ALGORITM tag so we can break the loop
         }
 
         chain.push_back(std::move(batch_cert));
