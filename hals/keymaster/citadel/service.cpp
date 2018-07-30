@@ -48,35 +48,6 @@ using ::android::hardware::keymaster::V4_0::ErrorCode;
 
 using KeymasterClient = ::nugget::app::keymaster::Keymaster;
 
-// TODO(ngm): move this code into the HAL implementation.
-static bool provisionStatus(KeymasterClient *keymasterClient) {
-    ProvisionPresharedSecretRequest request;
-    ProvisionPresharedSecretResponse response;
-    request.set_get_status(true);
-
-    const uint32_t status = keymasterClient->ProvisionPresharedSecret(
-        request, &response);
-    if (status != APP_SUCCESS) {
-        LOG(ERROR) << "ProvisionPresharedSecret(get_status) failed with status: "
-                   << ::nos::StatusCodeString(status);
-        return false;
-    }
-    const ErrorCode error_code = translate_error_code(response.error_code());
-    if (error_code != ErrorCode::OK) {
-        LOG(ERROR) << "ProvisionPresharedSecret(get_status) response error code: "
-                   << toString(error_code);
-        return false;
-    }
-    if (response.status() == PresharedSecretStatus::ALREADY_SET) {
-        LOG(INFO) << "Preshared secret previously provisioned";
-        return true;
-    } else {
-        LOG(WARNING) << "Preshared secret unprovisioned";
-        return false;
-    }
-
-}
-
 int main() {
     LOG(INFO) << "Keymaster HAL service starting";
 
@@ -95,7 +66,6 @@ int main() {
     KeymasterClient keymasterClient{citadeldProxy};
     sp<KeymasterDevice> keymaster = new KeymasterDevice{keymasterClient};
 
-    provisionStatus(&keymasterClient);
     const status_t status = keymaster->registerAsService("strongbox");
     if (status != OK) {
         LOG(FATAL) << "Failed to register Keymaster as a service (status: "
