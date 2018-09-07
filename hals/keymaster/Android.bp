@@ -28,6 +28,7 @@ cc_library {
     cflags: [
         // Needed for compiling BoringSSL.
         "-Wno-gnu-anonymous-struct",
+        "-Wno-implicit-fallthrough",  // in proto_utils.cpp:836
         "-Wno-nested-anon-types",
     ],
     shared_libs: [
