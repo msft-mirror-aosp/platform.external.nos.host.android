@@ -34,7 +34,7 @@
 #include <unistd.h>
 
 /*****************************************************************************/
-/* TODO: #include <linux/citadel.h> */
+/* Ideally, this should be in <linux/citadel.h> */
 #define CITADEL_IOC_MAGIC               'c'
 struct citadel_ioc_tpm_datagram {
     __u64        buf;
