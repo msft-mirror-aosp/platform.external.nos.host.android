@@ -117,6 +117,17 @@ uint32_t DateCodeToUint32(const std::string& code, bool include_day) {
     return return_value;
 }
 
+// Helper class to call a finalizer on stack unwind.
+class Finalize {
+ private:
+    std::function<void()> f_;
+
+ public:
+    Finalize(std::function<void()> f) : f_(f) {}
+    ~Finalize() { if (f_) f_(); }
+    void release() { f_ = {}; }
+};
+
 }  // namespace
 
 // std
@@ -696,12 +707,15 @@ Return<void> KeymasterDevice::attestKey(
     uint64_t operationHandle = startResponse.handle().handle();
     ContinueAttestKeyRequest continueRequest;
     ContinueAttestKeyResponse continueResponse;
+    // Prepare to abort the pending operation in event of an error.
+    Finalize finalize([&] () { abort(operationHandle); });
 
     continueRequest.mutable_handle()->set_handle(operationHandle);
     if (hidl_params_to_pb(
             attestParams, continueRequest.mutable_params()) != ErrorCode::OK) {
-      _hidl_cb(ErrorCode::INVALID_ARGUMENT, hidl_vec<hidl_vec<uint8_t> >{});
-      return Void();
+        LOG(ERROR) << "Failed to parse attest params";
+        _hidl_cb(ErrorCode::INVALID_ARGUMENT, hidl_vec<hidl_vec<uint8_t> >{});
+        return Void();
     }
 
     KM_CALLV(ContinueAttestKey, continueRequest, continueResponse,
@@ -851,6 +865,7 @@ Return<void> KeymasterDevice::attestKey(
     }
 
     _hidl_cb(ErrorCode::OK, chain);
+    finalize.release();
     return Void();
 }
 
