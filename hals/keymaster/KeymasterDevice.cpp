@@ -28,6 +28,8 @@
 
 #include <keymasterV4_0/key_param_output.h>
 
+#include <openssl/sha.h>
+
 #include <android-base/logging.h>
 #include <android-base/properties.h>
 
@@ -249,6 +251,24 @@ static ErrorCode status_to_error_code(uint32_t status)
         LOG(ERROR) << #meth << " : request failed with status: "              \
                    << nos::StatusCodeString(status);                          \
         _hidl_cb(status_to_error_code(status), __VA_ARGS__);                  \
+        return Void();                                                        \
+    }                                                                         \
+    if (error_code != ErrorCode::OK) {                                        \
+        LOG(ERROR) << #meth << " : device response error code: "              \
+                   << error_code;                                             \
+        _hidl_cb(error_code, __VA_ARGS__);                                    \
+        return Void();                                                        \
+    }                                                                         \
+}
+
+#define KM_CALLV_ABORT(meth, request, response, ...) {                        \
+    const uint32_t status = _keymaster. meth (request, &response);            \
+    const ErrorCode error_code = translate_error_code(response.error_code()); \
+    if (status != APP_SUCCESS) {                                              \
+        LOG(ERROR) << #meth << " : request failed with status: "              \
+                   << nos::StatusCodeString(status) << " aborting operation"; \
+        _hidl_cb(status_to_error_code(status), __VA_ARGS__);                  \
+        abort(request.handle().handle());                                     \
         return Void();                                                        \
     }                                                                         \
     if (error_code != ErrorCode::OK) {                                        \
@@ -1017,19 +1037,6 @@ Return<void> KeymasterDevice::update(
     UpdateOperationRequest request;
     UpdateOperationResponse response;
 
-    // TODO: does keystore chunk stream data?  To what quantum?
-    if (input.size() > KM_MAX_PROTO_FIELD_SIZE) {
-        LOG(ERROR) << "Excess input length: " << input.size()
-                   << " max allowed: " << KM_MAX_PROTO_FIELD_SIZE;
-        if (this->abort(operationHandle) != ErrorCode::OK) {
-            LOG(ERROR) << "abort( " << operationHandle
-                       << ") failed";
-        }
-        _hidl_cb(ErrorCode::INVALID_INPUT_LENGTH, 0,
-                 hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
-        return Void();
-    }
-
     uint32_t consumed;
     hidl_vec<uint8_t> output;
     hidl_vec<KeyParameter> params;
@@ -1068,8 +1075,8 @@ Return<void> KeymasterDevice::update(
     translate_verification_token(verificationToken,
                                  request.mutable_verification_token());
 
-    KM_CALLV(UpdateOperation, request, response,
-             0, hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
+    KM_CALLV_ABORT(UpdateOperation, request, response,
+                   0, hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
 
     if (buffer_advance(operationHandle, response.consumed()) != ErrorCode::OK) {
         _hidl_cb(ErrorCode::UNKNOWN_ERROR, 0, params, output);
@@ -1081,6 +1088,16 @@ Return<void> KeymasterDevice::update(
         reinterpret_cast<uint8_t*>(const_cast<char*>(response.output().data())),
         response.output().size(), false);
 
+    // Special case ECDSA sign + Digest::NONE, which discards all but
+    // the left-most len(SHA256) bytes.
+    Algorithm algorithm;
+    buffer_algorithm(operationHandle, &algorithm);
+    if (algorithm == Algorithm::EC) {
+        if (response.consumed() == 0 && // Implies Digest::NONE.
+            buffer_remaining(operationHandle) >= SHA256_DIGEST_LENGTH) {
+            consumed = input.size();    // Discard remaining input.
+        }
+    }
     _hidl_cb(ErrorCode::OK, consumed, params, output);
     return Void();
 }
@@ -1149,8 +1166,8 @@ Return<void> KeymasterDevice::finish(
     translate_verification_token(verificationToken,
                                  request.mutable_verification_token());
 
-    KM_CALLV(FinishOperation, request, response,
-             hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
+    KM_CALLV_ABORT(FinishOperation, request, response,
+                   hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
 
     pb_to_hidl_params(response.params(), &params);
     output.setToExternal(
