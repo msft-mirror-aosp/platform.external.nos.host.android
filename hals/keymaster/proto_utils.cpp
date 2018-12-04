@@ -789,9 +789,11 @@ ErrorCode hidl_params_to_map(const hidl_vec<KeyParameter>& params,
                 // Duplicates not allowed for these tags types.
                 return ErrorCode::INVALID_ARGUMENT;
             }
-            /* Fall-through! */
+            FALLTHROUGH_INTENDED;
         case TagType::ENUM_REP:
+            FALLTHROUGH_INTENDED;
         case TagType::UINT_REP:
+            FALLTHROUGH_INTENDED;
         case TagType::ULONG_REP:
             if (tag_map->find(params[i].tag) == tag_map->end()) {
                 vector<KeyParameter> v{params[i]};
