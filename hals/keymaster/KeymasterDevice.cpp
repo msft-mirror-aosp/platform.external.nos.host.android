@@ -229,6 +229,20 @@ static ErrorCode status_to_error_code(uint32_t status)
     }
 }
 
+static uint64_t ms_since_epoch(void)
+{
+    uint64_t seconds;
+    uint64_t milli_seconds;
+    struct timespec spec;
+
+    ::clock_gettime(CLOCK_REALTIME, &spec);
+
+    seconds = spec.tv_sec;
+    milli_seconds = spec.tv_nsec / (1000 * 1000);
+
+    return (seconds * 1000) + milli_seconds;
+}
+
 #define KM_CALL(meth, request, response) {                                    \
     const uint32_t status = _keymaster. meth (request, &response);            \
     const ErrorCode error_code = translate_error_code(response.error_code()); \
@@ -448,6 +462,7 @@ Return<void> KeymasterDevice::generateKey(
       _hidl_cb(ErrorCode::INVALID_ARGUMENT, blob, characteristics);
       return Void();
     }
+    request.set_creation_time_ms(ms_since_epoch());
 
     // Call device.
     KM_CALLV(GenerateKey, request, response,
@@ -512,6 +527,7 @@ Return<void> KeymasterDevice::importKey(
         _hidl_cb(error, hidl_vec<uint8_t>{}, KeyCharacteristics{});
         return Void();
     }
+    request.set_creation_time_ms(ms_since_epoch());
 
     KM_CALLV(ImportKey, request, response,
              hidl_vec<uint8_t>{}, KeyCharacteristics{});
@@ -1221,6 +1237,7 @@ Return<void> KeymasterDevice::importWrappedKey(
         _hidl_cb(error, hidl_vec<uint8_t>{}, KeyCharacteristics{});
         return Void();
     }
+    request.set_creation_time_ms(ms_since_epoch());
 
     KM_CALLV(ImportWrappedKey, request, response,
              hidl_vec<uint8_t>{}, KeyCharacteristics{});
