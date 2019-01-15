@@ -128,7 +128,7 @@ void TryEnablingCitadelUpdate(NuggetClientInterface& client, const nugget_app_pa
     msg->which_headers = NUGGET_ENABLE_HEADER_RW | NUGGET_ENABLE_HEADER_RO;
     const uint32_t appStatus = client.CallApp(APP_ID_NUGGET,
                                               NUGGET_PARAM_ENABLE_UPDATE,
-                                              buffer, nullptr);
+                                              buffer, &buffer);
     if (appStatus == APP_ERROR_BOGUS_ARGS) {
         LOG(ERROR) << "Incorrect Citadel update password";
         return;
@@ -139,8 +139,12 @@ void TryEnablingCitadelUpdate(NuggetClientInterface& client, const nugget_app_pa
         return;
     }
 
-    // Reboot for the update to take effect
-    RebootCitadel(client);
+    // If the header[s] changed, reboot for the update to take effect
+    // Old firmware doesn't have a reply but still needs to be updated
+    if (buffer.empty() || buffer[0]) {
+      LOG(INFO) << "Update password enabled a new image; rebooting Citadel";
+      RebootCitadel(client);
+    }
 }
 
 } // namespace
