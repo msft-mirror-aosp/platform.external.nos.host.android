@@ -130,6 +130,12 @@ class Finalize {
     void release() { f_ = {}; }
 };
 
+inline std::string hidlVec2String(const hidl_vec<uint8_t>& value) {
+    return std::string(
+        reinterpret_cast<const std::string::value_type*>(
+            &value[0]), value.size());
+}
+
 }  // namespace
 
 // std
@@ -1132,25 +1138,38 @@ Return<void> KeymasterDevice::finish(
     FinishOperationRequest request;
     FinishOperationResponse response;
 
-    if (input.size() > KM_MAX_PROTO_FIELD_SIZE) {
-        LOG(ERROR) << "Excess input length: " << input.size()
-                   << " max allowed: " << KM_MAX_PROTO_FIELD_SIZE;
-        if (this->abort(operationHandle) != ErrorCode::OK) {
-            LOG(ERROR) << "abort( " << operationHandle
-                       << ") failed";
-        }
-        _hidl_cb(ErrorCode::INVALID_INPUT_LENGTH,
-                 hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
-        return Void();
-    }
-
-    uint32_t consumed;
     ErrorCode error_code;
-    error_code = buffer_append(operationHandle, input, &consumed);
-    if (error_code != ErrorCode::OK) {
-        _hidl_cb(error_code,
-                 hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
-        return Void();
+    hidl_vec<uint8_t> output;
+
+    // Consume any input data via update calls.
+    size_t consumed = 0;
+    hidl_vec<KeyParameter> input_params = inParams;
+    string update_output_str;
+    while (consumed < input.size()) {
+        hidl_vec<KeyParameter> out_params;
+        update_cb _update_hidl_cb =
+            [&] (
+                ErrorCode error, uint32_t input_consumed,
+                const hidl_vec<KeyParameter>& params,
+                const hidl_vec<uint8_t>& update_output) {
+                    error_code = error;
+                    if (error == ErrorCode::OK) {
+                        consumed += input_consumed;
+                        input_params = params;  // Update the params.
+                        update_output_str += hidlVec2String(update_output);
+                    }
+            };
+
+        hidl_vec<uint8_t> input_data;
+        input_data.setToExternal(const_cast<uint8_t*>(&input.data()[consumed]),
+                                 input.size() - consumed);
+        update(operationHandle, input_params, input_data, authToken,
+               verificationToken, _update_hidl_cb);
+        if (error_code != ErrorCode::OK) {
+            _hidl_cb(error_code,
+                     hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
+            return Void();
+        }
     }
 
     hidl_vec<uint8_t> data;
@@ -1164,9 +1183,8 @@ Return<void> KeymasterDevice::finish(
     request.mutable_handle()->set_handle(operationHandle);
 
     hidl_vec<KeyParameter> params;
-    hidl_vec<uint8_t> output;
     if (hidl_params_to_pb(
-            inParams, request.mutable_params()) != ErrorCode::OK) {
+            input_params, request.mutable_params()) != ErrorCode::OK) {
       _hidl_cb(ErrorCode::INVALID_ARGUMENT, params, output);
       return Void();
     }
@@ -1186,9 +1204,13 @@ Return<void> KeymasterDevice::finish(
                    hidl_vec<KeyParameter>{}, hidl_vec<uint8_t>{});
 
     pb_to_hidl_params(response.params(), &params);
+    // Concatenate accumulated output from Update().
+    update_output_str += string(
+        response.output().data(), response.output().size());
     output.setToExternal(
-        reinterpret_cast<uint8_t*>(const_cast<char*>(response.output().data())),
-        response.output().size(), false);
+        reinterpret_cast<uint8_t*>(const_cast<char*>(
+                                       update_output_str.data())),
+        update_output_str.size(), false);
 
     _hidl_cb(ErrorCode::OK, params, output);
     return Void();
