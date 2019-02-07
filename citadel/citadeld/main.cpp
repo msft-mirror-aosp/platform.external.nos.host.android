@@ -140,6 +140,15 @@ class CitadelProxy : public BnCitadeld {
         return Status::ok();
     }
 
+    Status getCachedStats(std::vector<uint8_t>* const response) override {
+        std::unique_lock<std::mutex> lock(_stats_mutex);
+
+        response->resize(sizeof(_stats));
+        memcpy(response->data(), &_stats, sizeof(_stats));
+
+        return Status::ok();
+    }
+
 private:
     static constexpr auto kMaxAppId = std::numeric_limits<uint8_t>::max();
 
@@ -147,18 +156,22 @@ private:
     std::mutex _appLocks[kMaxAppId + 1];
     struct nugget_app_low_power_stats _stats;
     DeferredCallback _stats_collection;
+    std::mutex _stats_mutex;
 
     void cacheStats(void) {
         std::vector<uint8_t> buffer;
         buffer.reserve(sizeof(_stats));
         uint32_t rv;
 
-        // Make the call to the app while holding the lock for that app
-        std::unique_lock<std::mutex> lock(_appLocks[APP_ID_NUGGET]);
-        rv = _client.CallApp(APP_ID_NUGGET, NUGGET_PARAM_GET_LOW_POWER_STATS,
-                             buffer, &buffer);
+        {
+            std::unique_lock<std::mutex> lock(_appLocks[APP_ID_NUGGET]);
+            rv = _client.CallApp(APP_ID_NUGGET,
+                                 NUGGET_PARAM_GET_LOW_POWER_STATS, buffer,
+                                 &buffer);
+        }
 
         if (rv == APP_SUCCESS) {
+            std::unique_lock<std::mutex> lock(_stats_mutex);
             memcpy(&_stats, buffer.data(),
                    std::min(sizeof(_stats), buffer.size()));
         }
