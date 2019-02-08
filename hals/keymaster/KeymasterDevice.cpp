@@ -97,7 +97,7 @@ uint32_t VersionToUint32(const std::string& version) {
     return major * 10000 + minor * 100 + subminor;
 }
 
-uint32_t DateCodeToUint32(const std::string& code) {
+uint32_t DateCodeToUint32(const std::string& code, bool include_day) {
     // Keep digits only.
     std::string filtered_code = DigitsOnly(code);
 
@@ -105,9 +105,14 @@ uint32_t DateCodeToUint32(const std::string& code) {
     uint32_t return_value = 0;
     if (filtered_code.size() == 8) {
         return_value = std::stoi(filtered_code);
+        if (!include_day) {
+            return_value /= 100;
+        }
     } else if (filtered_code.size() == 6) {
         return_value = std::stoi(filtered_code);
+        if (include_day) {
             return_value *= 100;
+        }
     } else {
         LOG(ERROR) << "Unexpected patchset format: \"" << code << "\"";
     }
@@ -304,9 +309,11 @@ KeymasterDevice::KeymasterDevice(KeymasterClient& keymaster) :
              WaitForPropertyCreation(PROPERTY_VENDOR_PATCHLEVEL))) {}
 
     _os_version = VersionToUint32(GetProperty(PROPERTY_OS_VERSION, ""));
-    _os_patchlevel = DateCodeToUint32(GetProperty(PROPERTY_OS_PATCHLEVEL, ""));
+    _os_patchlevel = DateCodeToUint32(GetProperty(PROPERTY_OS_PATCHLEVEL, ""),
+                                     false /* include_day */);
     _vendor_patchlevel = DateCodeToUint32(
-        GetProperty(PROPERTY_VENDOR_PATCHLEVEL, ""));
+            GetProperty(PROPERTY_VENDOR_PATCHLEVEL, ""),
+            true /* include_day */);
 
     SendSystemVersionInfo();
     GetBootInfo();
