@@ -18,11 +18,13 @@
 #include <chrono>
 #include <condition_variable>
 #include <functional>
+#include <future>
 #include <limits>
 #include <mutex>
 #include <thread>
 
 #include <android-base/logging.h>
+#include <binder/IBinder.h>
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 
@@ -32,20 +34,29 @@
 
 #include <android/hardware/citadel/BnCitadeld.h>
 
-using ::android::OK;
+#include <android/vendor/powerstats/BnPixelPowerStatsCallback.h>
+#include <android/vendor/powerstats/BnPixelPowerStatsProvider.h>
+#include <android/vendor/powerstats/StateResidencyData.h>
+
 using ::android::defaultServiceManager;
-using ::android::sp;
-using ::android::status_t;
 using ::android::IPCThreadState;
 using ::android::IServiceManager;
+using ::android::OK;
 using ::android::ProcessState;
-
+using ::android::sp;
+using ::android::status_t;
+using ::android::wp;
 using ::android::binder::Status;
 
 using ::nos::NuggetClient;
 
 using ::android::hardware::citadel::BnCitadeld;
 using ::android::hardware::citadel::ICitadeld;
+
+using android::IBinder;
+using android::vendor::powerstats::BnPixelPowerStatsCallback;
+using android::vendor::powerstats::IPixelPowerStatsProvider;
+using android::vendor::powerstats::StateResidencyData;
 
 namespace {
 
@@ -95,6 +106,83 @@ class DeferredCallback {
     std::condition_variable _cv;
 };
 
+// This provides a Binder interface for the powerstats service to fetch our
+// power stats info from. This is a secondary function of citadeld. Failures
+// here must not block or delay AP/Citadel communication.
+class StatsDelegate : public BnPixelPowerStatsCallback,
+                      public IBinder::DeathRecipient {
+  public:
+    StatsDelegate(std::function<Status(std::vector<StateResidencyData>*)> fn)
+        : func_(fn) {}
+
+    // methods from BnPixelPowerStatsCallback
+    virtual Status getStats(std::vector<StateResidencyData>* stats) override {
+        return func_(stats);
+    }
+
+    // methods from IBinder::DeathRecipient
+    virtual IBinder* onAsBinder() override { return this; }
+    virtual void binderDied(const wp<IBinder>& who) override {
+        LOG(INFO) << "powerstats service died";
+        const sp<IBinder>& service = who.promote();
+        if (service != nullptr) {
+            service->unlinkToDeath(this);
+        }
+        sp<IBinder> powerstats_service = WaitForPowerStatsService();
+        registerWithPowerStats(powerstats_service);
+    }
+
+    // post-creation init (Binder calls inside constructor are troublesome)
+    void registerWithPowerStats(sp<IBinder>& powerstats_service) {
+        sp<IPixelPowerStatsProvider> powerstats_provider =
+                android::interface_cast<IPixelPowerStatsProvider>(
+                        powerstats_service);
+
+        LOG(INFO) << "signing up for a notification if powerstats dies";
+        auto ret = asBinder(powerstats_provider)
+                           ->linkToDeath(this, 0u /* cookie */);
+        if (ret != android::OK) {
+            LOG(ERROR) << "linkToDeath() returned " << ret
+                       << " - we will NOT be notified on powerstats death";
+        }
+
+        LOG(INFO) << "registering our callback with powerstats service";
+        Status status = powerstats_provider->registerCallback("Citadel", this);
+        if (!status.isOk()) {
+            LOG(ERROR) << "failed to register callback: " << status.toString8();
+        }
+    }
+
+    // static helper function
+    static sp<IBinder> WaitForPowerStatsService() {
+        LOG(INFO) << "waiting for powerstats service to appear";
+        sp<IBinder> svc;
+        while (true) {
+            svc = defaultServiceManager()->checkService(
+                    android::String16("power.stats-vendor"));
+            if (svc != nullptr) {
+                LOG(INFO) << "A wild powerstats service has appeared!";
+                return svc;
+            }
+            sleep(1);
+        }
+    }
+
+    // Creates a new StatsDelegate only after a powerstats service becomes
+    // available for it to register with.
+    static sp<StatsDelegate> MakeOne(
+            std::function<Status(std::vector<StateResidencyData>*)> fn) {
+        sp<IBinder> powerstats_service =
+                StatsDelegate::WaitForPowerStatsService();
+        sp<StatsDelegate> sd = new StatsDelegate(fn);
+        sd->registerWithPowerStats(powerstats_service);
+        return sd;
+    }
+
+  private:
+    const std::function<Status(std::vector<StateResidencyData>*)> func_;
+};
+
 class CitadelProxy : public BnCitadeld {
   public:
     CitadelProxy(NuggetClient& client)
@@ -102,6 +190,8 @@ class CitadelProxy : public BnCitadeld {
           _stats_collection(500ms, std::bind(&CitadelProxy::cacheStats, this)) {
     }
     ~CitadelProxy() override = default;
+
+    // methods from BnCitadeld
 
     Status callApp(const int32_t _appId, const int32_t _arg,
                    const std::vector<uint8_t>& request,
@@ -142,9 +232,36 @@ class CitadelProxy : public BnCitadeld {
 
     Status getCachedStats(std::vector<uint8_t>* const response) override {
         std::unique_lock<std::mutex> lock(_stats_mutex);
-
         response->resize(sizeof(_stats));
         memcpy(response->data(), &_stats, sizeof(_stats));
+        return Status::ok();
+    }
+
+    // Interaction with the powerstats service is handled by the StatsDelegate
+    // class, but its getStats() method calls this to access our cached stats.
+    Status onGetStats(std::vector<StateResidencyData>* stats) {
+        std::unique_lock<std::mutex> lock(_stats_mutex);
+
+        StateResidencyData data1;
+        data1.state = "Reset";
+        data1.totalTimeInStateMs = _stats.time_since_hard_reset / 1000;
+        data1.totalStateEntryCount = _stats.hard_reset_count;
+        data1.lastEntryTimestampMs = 0;
+        stats->emplace_back(data1);
+
+        StateResidencyData data2;
+        data2.state = "Active";
+        data2.totalTimeInStateMs = _stats.time_spent_awake / 1000;
+        data2.totalStateEntryCount = _stats.wake_count;
+        data2.lastEntryTimestampMs = _stats.time_at_last_wake / 1000;
+        stats->emplace_back(data2);
+
+        StateResidencyData data3;
+        data3.state = "Deep-Sleep";
+        data3.totalTimeInStateMs = _stats.time_spent_in_deep_sleep / 1000;
+        data3.totalStateEntryCount = _stats.deep_sleep_count;
+        data3.lastEntryTimestampMs = _stats.time_at_last_deep_sleep / 1000;
+        stats->emplace_back(data3);
 
         return Status::ok();
     }
@@ -214,14 +331,27 @@ int main() {
     const status_t status = defaultServiceManager()->addService(ICitadeld::descriptor, proxy);
     if (status != OK) {
         LOG(FATAL) << "Failed to register citadeld as a service (status " << status << ")";
+        return 1;
     }
 
     // Handle interrupts triggered by Citadel and dispatch any events to
     // registered listeners.
     std::thread event_dispatcher(CitadelEventDispatcher, *citadel.Device());
 
+    // We'll create a StatsDelegate object to talk to the powerstats service,
+    // but it will need a function to access the stats we've cached in the
+    // CitadelProxy object.
+    std::function<Status(std::vector<StateResidencyData>*)> fn =
+            std::bind(&CitadelProxy::onGetStats, proxy, std::placeholders::_1);
+
+    // Use a separate thread to wait for the powerstats service to appear, so
+    // the Citadel proxy can start working ASAP.
+    std::future<sp<StatsDelegate>> sd =
+            std::async(std::launch::async, StatsDelegate::MakeOne, fn);
+
     // Start handling binder requests with multiple threads
     ProcessState::self()->startThreadPool();
     IPCThreadState::self()->joinThreadPool();
+
     return 0;
 }
