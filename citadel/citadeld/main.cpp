@@ -243,7 +243,7 @@ class CitadelProxy : public BnCitadeld {
         std::unique_lock<std::mutex> lock(_stats_mutex);
 
         StateResidencyData data1;
-        data1.state = "Reset";
+        data1.state = "Last-Reset";
         data1.totalTimeInStateMs = _stats.time_since_hard_reset / 1000;
         data1.totalStateEntryCount = _stats.hard_reset_count;
         data1.lastEntryTimestampMs = 0;
