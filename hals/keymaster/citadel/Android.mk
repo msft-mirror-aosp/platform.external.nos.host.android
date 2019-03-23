@@ -45,18 +45,6 @@ LOCAL_CLANG := true
 LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_OWNER := google
 
-ifneq ($(BUILD_WITHOUT_VENDOR),true)
-ifeq ($(call is-board-platform-in-list, sdm845),true)
-LOCAL_SHARED_LIBRARIES += \
-    libkeymasterprovision \
-    libkeymasterutils \
-    libkeymasterdeviceutils \
-    libQSEEComAPI
-
-LOCAL_CFLAGS += -DENABLE_QCOM_OTF_PROVISIONING=1
-endif
-endif
-
 include $(BUILD_EXECUTABLE)
 
 #cc_binary {
