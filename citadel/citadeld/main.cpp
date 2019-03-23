@@ -19,6 +19,7 @@
 #include <condition_variable>
 #include <functional>
 #include <future>
+#include <iomanip>
 #include <limits>
 #include <mutex>
 #include <thread>
@@ -29,6 +30,7 @@
 #include <binder/IServiceManager.h>
 
 #include <app_nugget.h>
+#include <citadel_events.h>
 #include <nos/NuggetClient.h>
 #include <nos/device.h>
 
@@ -187,6 +189,7 @@ class CitadelProxy : public BnCitadeld {
   public:
     CitadelProxy(NuggetClient& client)
         : _client{client},
+          _event_thread(std::bind(&CitadelProxy::dispatchEvents, this)),
           _stats_collection(500ms, std::bind(&CitadelProxy::cacheStats, this)) {
     }
     ~CitadelProxy() override = default;
@@ -212,12 +215,7 @@ class CitadelProxy : public BnCitadeld {
         const uint8_t appId = static_cast<uint32_t>(_appId);
         const uint16_t arg = static_cast<uint16_t>(_arg);
         uint32_t* const appStatus = reinterpret_cast<uint32_t*>(_aidl_return);
-
-        // Make the call to the app while holding the lock for that app
-        {
-            std::unique_lock<std::mutex> lock(_appLocks[appId]);
-            *appStatus = _client.CallApp(appId, arg, request, response);
-        }
+        *appStatus = lockedCallApp(appId, arg, request, response);
 
         _stats_collection.schedule();
 
@@ -272,46 +270,93 @@ private:
     static constexpr auto kMaxAppId = std::numeric_limits<uint8_t>::max();
 
     NuggetClient& _client;
+    std::thread _event_thread;
     std::mutex _appLocks[kMaxAppId + 1];
     struct nugget_app_low_power_stats _stats;
     DeferredCallback _stats_collection;
     std::mutex _stats_mutex;
 
+    // Make the call to the app while holding the lock for that app
+    uint32_t lockedCallApp(uint32_t appId, uint16_t arg,
+                           const std::vector<uint8_t>& request,
+                           std::vector<uint8_t>* response) {
+        std::unique_lock<std::mutex> lock(_appLocks[appId]);
+        return _client.CallApp(appId, arg, request, response);
+    }
+
     void cacheStats(void) {
         std::vector<uint8_t> buffer;
+
         buffer.reserve(sizeof(_stats));
-        uint32_t rv;
-
-        {
-            std::unique_lock<std::mutex> lock(_appLocks[APP_ID_NUGGET]);
-            rv = _client.CallApp(APP_ID_NUGGET,
-                                 NUGGET_PARAM_GET_LOW_POWER_STATS, buffer,
-                                 &buffer);
-        }
-
+        uint32_t rv = lockedCallApp(APP_ID_NUGGET,
+                                    NUGGET_PARAM_GET_LOW_POWER_STATS, buffer,
+                                    &buffer);
         if (rv == APP_SUCCESS) {
             std::unique_lock<std::mutex> lock(_stats_mutex);
             memcpy(&_stats, buffer.data(),
                    std::min(sizeof(_stats), buffer.size()));
         }
     }
-};
 
-[[noreturn]] void CitadelEventDispatcher(const nos_device& device) {
-    LOG(INFO) << "Event dispatcher startup.";
-    while(1) {
-        if (device.ops.wait_for_interrupt(device.ctx, -1) > 0) {
-            LOG(INFO) << "Citadel has dispatched an event";
-        } else {
-            LOG(INFO) << "Citadel did something unexpected";
+    [[noreturn]] void dispatchEvents(void) {
+        LOG(INFO) << "Event dispatcher startup.";
+
+        const nos_device& device = *_client.Device();
+
+        while (true) {
+
+            const int wait_rv = device.ops.wait_for_interrupt(device.ctx, -1);
+            if (wait_rv <= 0) {
+                LOG(WARNING) << "device.ops.wait_for_interrupt: " << wait_rv;
+                continue;
+            }
+
+            // CTDL_AP_IRQ is asserted, fetch all the event_records from Citadel
+            while (true) {
+                struct event_record evt;
+                std::vector<uint8_t> buffer;
+                buffer.reserve(sizeof(evt));
+                const uint32_t rv = lockedCallApp(APP_ID_NUGGET,
+                                                  NUGGET_PARAM_GET_EVENT_RECORD,
+                                                  buffer, &buffer);
+                if (rv != APP_SUCCESS) {
+                    LOG(WARNING) << "failed to fetch event_record: " << rv;
+                    break;
+                }
+
+                if (buffer.size() == 0) {
+                    // Success but no data means we've fetched them all
+                    break;
+                }
+
+                // TODO(b/34946126): Do something more than just log it
+                memcpy(&evt, buffer.data(), sizeof(evt));
+                const uint64_t secs = evt.uptime_usecs / 1000000UL;
+                const uint64_t usecs = evt.uptime_usecs - (secs * 1000000UL);
+                LOG(INFO) << std::setfill('0') << std::internal
+                          << "event_record " << evt.reset_count << "/"
+                          << secs << "." << std::setw(6) << usecs
+                          << " " << evt.id
+                          << std::hex
+                          << " 0x" << std::setw(8) << evt.u.raw.w[0]
+                          << " 0x" << std::setw(8) << evt.u.raw.w[1]
+                          << " 0x" << std::setw(8) << evt.u.raw.w[2];
+            }
+
+            // TODO: Add a more intelligent back-off (and other action?) here
+            //
+            // When Citadel indicates that it has event_records for us, we fetch
+            // one at a time without delay until we've gotten them all (and then
+            // wait a bit to give it time to deassert CTDL_AP_IRQ).
+            //
+            // OTOH, if Citadel is just constantly asserting CTDL_AP_IRQ but
+            // doesn't actually have any events for us, then a) that's probably
+            // a bug, and b) we shouldn't spin madly here just querying it over
+            // and over.
+            sleep(1);
         }
-
-        // This is a placeholder for the message handling that gives citadel a
-        // chance to deassert CTLD_AP_IRQ, so this doesn't spam the logs.
-        // TODO(b/62713383) Replace this with the code to contact citadel.
-        sleep(1);
     }
-}
+};
 
 } // namespace
 
@@ -335,10 +380,6 @@ int main() {
         LOG(FATAL) << "Failed to register citadeld as a service (status " << status << ")";
         return 1;
     }
-
-    // Handle interrupts triggered by Citadel and dispatch any events to
-    // registered listeners.
-    std::thread event_dispatcher(CitadelEventDispatcher, *citadel.Device());
 
     // We'll create a StatsDelegate object to talk to the powerstats service,
     // but it will need a function to access the stats we've cached in the
