@@ -214,8 +214,10 @@ class CitadelProxy : public BnCitadeld {
         uint32_t* const appStatus = reinterpret_cast<uint32_t*>(_aidl_return);
 
         // Make the call to the app while holding the lock for that app
-        std::unique_lock<std::mutex> lock(_appLocks[appId]);
-        *appStatus = _client.CallApp(appId, arg, request, response);
+        {
+            std::unique_lock<std::mutex> lock(_appLocks[appId]);
+            *appStatus = _client.CallApp(appId, arg, request, response);
+        }
 
         _stats_collection.schedule();
 
