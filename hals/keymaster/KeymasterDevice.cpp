@@ -807,13 +807,13 @@ Return<void> KeymasterDevice::attestKey(
     }
 
     vector<hidl_vec<uint8_t> > chain;
+    string attestation_str = ss.str();
     {
         hidl_vec<uint8_t> attestation_certificate;
         attestation_certificate.setToExternal(
-            reinterpret_cast<uint8_t*>(
-                const_cast<char*>(ss.str().data())),
-            ss.str().size(), false);
-
+                reinterpret_cast<uint8_t*>(
+                        const_cast<char*>(attestation_str.data())),
+                attestation_str.size(), false);
 
         chain.push_back(std::move(attestation_certificate));
 
