@@ -346,6 +346,7 @@ Return<void> KeymasterDevice::getHmacSharingParameters(
 
     if (ec != ErrorCode::OK) {
         _hidl_cb(ec, HmacSharingParameters());
+        return Void();
     }
 
     const std::string & nonce = response.hmac_sharing_params().nonce();
@@ -717,6 +718,7 @@ Return<void> KeymasterDevice::attestKey(
         ::strftime(not_after_str, sizeof(not_after_str),
                    "%y%m%d%H%M%SZ", gmtime(&not_after)) == 0) {
         _hidl_cb(ErrorCode::UNKNOWN_ERROR, hidl_vec<hidl_vec<uint8_t> >{});
+        return Void();
     }
 
     startRequest.mutable_blob()->set_blob(&keyToAttest[0], keyToAttest.size());
