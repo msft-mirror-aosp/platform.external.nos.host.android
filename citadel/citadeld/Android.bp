@@ -14,11 +14,15 @@
 // limitations under the License.
 //
 
+filegroup {
+    name: "citadel_aidl",
+    srcs: ["aidl/android/hardware/citadel/ICitadeld.aidl"],
+    path: "aidl",
+}
+
 cc_defaults {
     name: "citadeld_defaults",
-    srcs: [
-        "aidl/android/hardware/citadel/ICitadeld.aidl",
-    ],
+    srcs: [":citadel_aidl"],
     defaults: ["nos_cc_defaults"],
     header_libs: [
         "nos_headers",
