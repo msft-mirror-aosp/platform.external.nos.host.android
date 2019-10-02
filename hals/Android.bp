@@ -22,7 +22,6 @@ cc_defaults {
     shared_libs: [
         "libbase",
         "libhidlbase",
-        "libhidltransport",
         "libnos",
         "libnosprotos",
         "libutils",
