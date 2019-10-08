@@ -56,6 +56,7 @@ public:
         case Algorithm::EC:
         case Algorithm::HMAC:
             _blockSize = 0;
+            break;
         default:
             break;
         }

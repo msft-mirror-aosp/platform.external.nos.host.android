@@ -37,7 +37,7 @@ cc_library {
         "libcrypto",
         "libprotobuf-cpp-full",
         "nos_app_keymaster",
-        "libhidltransport",
+        "libhidlbase",
     ],
     export_include_dirs: ["include"],
 }
